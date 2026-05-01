@@ -1,6 +1,7 @@
 import { cancel, confirm, group, intro, select, text } from "@clack/prompts";
 import chalk from "chalk";
 import { PackageManager, packageManagers } from "../data";
+import { orms } from "../data/orms";
 import { BasePrompt } from "./base.prompt";
 
 export interface InitPromptData {
@@ -42,6 +43,17 @@ export class InitPrompt extends BasePrompt<InitPromptData> {
               value: pm.id,
               label: pm.name,
             })),
+          }),
+        orm: () =>
+          select({
+            message: "Which ORM do you want to use?",
+            options: [
+              { value: "none", label: "None" },
+              ...orms.map((orm) => ({
+                value: orm.id,
+                label: orm.name,
+              })),
+            ],
           }),
         installDependencies: () =>
           confirm({
