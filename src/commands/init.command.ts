@@ -1,4 +1,4 @@
-import { InitPrompt } from "../prompts/init/init.prompt";
+import { InitPrompt } from "../prompts";
 import { BaseCommand } from "./base.command";
 
 export class InitCommand extends BaseCommand {
