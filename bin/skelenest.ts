@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { Command } from "commander";
-import { InitCommand } from "../src/commands/init.command";
+import { InitCommand } from "../src/commands";
 import { printBanner } from "../src/utils/banner.util";
 
 const program = new Command();
