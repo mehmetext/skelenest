@@ -1,1 +1,1 @@
-export * from "./package-manager";
+export * from "./package-managers";
