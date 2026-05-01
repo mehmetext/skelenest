@@ -1,4 +1,4 @@
-import { cancel, group, intro, select, text } from "@clack/prompts";
+import { cancel, confirm, group, intro, select, text } from "@clack/prompts";
 import chalk from "chalk";
 import { PackageManager, packageManagers } from "../data";
 import { BasePrompt } from "./base.prompt";
@@ -6,6 +6,7 @@ import { BasePrompt } from "./base.prompt";
 export interface InitPromptData {
   name: string;
   packageManager: PackageManager["id"];
+  installDependencies: boolean;
 }
 
 export class InitPrompt extends BasePrompt<InitPromptData> {
@@ -34,6 +35,11 @@ export class InitPrompt extends BasePrompt<InitPromptData> {
               value: pm.id,
               label: pm.name,
             })),
+          }),
+        installDependencies: () =>
+          confirm({
+            message: "Do you want to install dependencies?",
+            initialValue: true,
           }),
       },
       {
