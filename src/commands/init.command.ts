@@ -1,4 +1,5 @@
 import { InitPrompt } from "../prompts";
+import { InitScaffolder } from "../scaffolders";
 import { BaseCommand } from "./base.command";
 
 export class InitCommand extends BaseCommand {
@@ -12,6 +13,8 @@ export class InitCommand extends BaseCommand {
   async execute(): Promise<void> {
     const prompt = new InitPrompt();
     const data = await prompt.execute();
-    console.log(data);
+
+    const initScaffolder = new InitScaffolder(data);
+    await initScaffolder.execute();
   }
 }
