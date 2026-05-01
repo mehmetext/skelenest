@@ -1,7 +1,7 @@
 import { cancel, group, intro, select, text } from "@clack/prompts";
 import chalk from "chalk";
+import { PackageManager, packageManagers } from "../../data";
 import { BasePrompt } from "../base.prompt";
-import { packageManagers, type PackageManager } from "./package-manager";
 
 export interface InitPromptData {
   name: string;
