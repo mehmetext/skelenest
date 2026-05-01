@@ -5,6 +5,7 @@ import { BasePrompt } from "./base.prompt";
 
 export interface InitPromptData {
   name: string;
+  port: string;
   packageManager: PackageManager["id"];
   installDependencies: boolean;
 }
@@ -27,6 +28,12 @@ export class InitPrompt extends BasePrompt<InitPromptData> {
               if (value?.length === 0) return "Project name cannot be empty.";
             },
             defaultValue: "my-skelenest-app",
+          }),
+        port: () =>
+          text({
+            message: "What is the port number?",
+            defaultValue: "3000",
+            placeholder: "3000",
           }),
         packageManager: () =>
           select({

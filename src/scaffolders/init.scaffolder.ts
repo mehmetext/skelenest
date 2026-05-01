@@ -20,8 +20,6 @@ export class InitScaffolder extends BaseScaffolder {
     await assertTargetDirectoryEmpty(targetDir);
     await fs.ensureDir(targetDir);
 
-    console.log(__dirname);
-
     const templateRoot = path.join(__dirname, "..", "src", "templates", "init");
 
     const sDirectory = spinner();
@@ -33,6 +31,7 @@ export class InitScaffolder extends BaseScaffolder {
         data: {
           name: this.data.name,
           packageManager: this.data.packageManager,
+          port: this.data.port,
         },
       });
     } catch (error) {

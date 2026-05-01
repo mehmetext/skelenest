@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "description": "",
   "scripts": {
-    "dev": "tsx watch bin/skelenest.ts",
-    "build": "tsup bin/skelenest.ts src/**/*.ts --format cjs --dts && chmod +x dist/bin/skelenest.js && cpx \"src/templates/**/*\" dist/src/templates",
+    "dev": "rm -rf dist && tsx watch bin/skelenest.ts",
+    "build": "rm -rf dist && tsup bin/skelenest.ts src/**/*.ts --format cjs --dts && chmod +x dist/bin/skelenest.js && cpx \"src/templates/**/*\" dist/src/templates && cpx \"src/templates/**/.[!.]*\" dist/src/templates",
     "start": "node ./dist/bin/skelenest.js",
     "dev:init": "pnpm build && skelenest init"
   },
