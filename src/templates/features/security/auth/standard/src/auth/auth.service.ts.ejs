@@ -1,7 +1,9 @@
-import type { User } from "src/generated/prisma/client";
-import { PrismaService } from "src/prisma/prisma.service";
-import { CreateUserInput, UsersService } from "../users/users.service";
 <%_ const includesRedis = selectedOptionIds.includes('redis'); _%>
+import type { User } from "src/generated/prisma/client";
+<%_ if (!includesRedis) { _%>
+import { PrismaService } from "src/prisma/prisma.service";
+<%_ } _%>
+import { CreateUserInput, UsersService } from "../users/users.service";
 <%_ if (includesRedis) { _%>
 import { InjectRedis } from "@nestjs-modules/ioredis";
 <%_ } _%>
@@ -66,7 +68,9 @@ export class AuthService {
   private readonly refreshTtlSeconds: number;
 
   constructor(
+<%_ if (!includesRedis) { _%>
     private readonly prisma: PrismaService,
+<%_ } _%>
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
 <%_ if (includesRedis) { _%>

@@ -1,4 +1,7 @@
+<%_ const includesSwagger = selectedOptionIds.includes('swagger'); _%>
+<%_ if (includesSwagger) { _%>
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+<%_ } _%>
 import { Transform } from "class-transformer";
 import {
   IsEmail,
@@ -11,7 +14,9 @@ import {
 import { PASSWORD_MIN_LENGTH, VALIDATION } from "../auth.constants";
 
 export class RegisterDto {
+<%_ if (includesSwagger) { _%>
   @ApiProperty({ example: "user@example.com" })
+<%_ } _%>
   @Transform(({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim().toLowerCase() : value
   )
@@ -19,13 +24,17 @@ export class RegisterDto {
   @MaxLength(VALIDATION.EMAIL_MAX_LENGTH)
   email!: string;
 
+<%_ if (includesSwagger) { _%>
   @ApiProperty({ example: "password123", minLength: PASSWORD_MIN_LENGTH })
+<%_ } _%>
   @IsString()
   @MinLength(PASSWORD_MIN_LENGTH)
   @MaxLength(VALIDATION.PASSWORD_MAX_LENGTH)
   password!: string;
 
+<%_ if (includesSwagger) { _%>
   @ApiPropertyOptional({ example: "John" })
+<%_ } _%>
   @Transform(({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim() || undefined : value
   )
@@ -34,7 +43,9 @@ export class RegisterDto {
   @IsOptional()
   firstName?: string;
 
+<%_ if (includesSwagger) { _%>
   @ApiPropertyOptional({ example: "Doe" })
+<%_ } _%>
   @Transform(({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim() || undefined : value
   )
@@ -45,7 +56,9 @@ export class RegisterDto {
 }
 
 export class LoginDto {
+<%_ if (includesSwagger) { _%>
   @ApiProperty({ example: "user@example.com" })
+<%_ } _%>
   @Transform(({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim().toLowerCase() : value
   )
@@ -53,7 +66,9 @@ export class LoginDto {
   @MaxLength(VALIDATION.EMAIL_MAX_LENGTH)
   email!: string;
 
+<%_ if (includesSwagger) { _%>
   @ApiProperty({ example: "password123" })
+<%_ } _%>
   @IsString()
   @IsNotEmpty()
   @MaxLength(VALIDATION.PASSWORD_MAX_LENGTH)
@@ -61,35 +76,51 @@ export class LoginDto {
 }
 
 export class RefreshTokenDto {
+<%_ if (includesSwagger) { _%>
   @ApiProperty()
+<%_ } _%>
   @IsString()
   @IsNotEmpty()
   refreshToken!: string;
 }
 
 export class AuthTokensDto {
+<%_ if (includesSwagger) { _%>
   @ApiProperty()
+<%_ } _%>
   accessToken!: string;
 
+<%_ if (includesSwagger) { _%>
   @ApiProperty()
+<%_ } _%>
   refreshToken!: string;
 }
 
 export class AuthUserDto {
+<%_ if (includesSwagger) { _%>
   @ApiProperty()
+<%_ } _%>
   id!: string;
 
+<%_ if (includesSwagger) { _%>
   @ApiProperty()
+<%_ } _%>
   email!: string;
 
+<%_ if (includesSwagger) { _%>
   @ApiPropertyOptional({ nullable: true })
+<%_ } _%>
   firstName!: string | null;
 
+<%_ if (includesSwagger) { _%>
   @ApiPropertyOptional({ nullable: true })
+<%_ } _%>
   lastName!: string | null;
 }
 
 export class AuthResponseDto extends AuthTokensDto {
+<%_ if (includesSwagger) { _%>
   @ApiProperty({ type: AuthUserDto })
+<%_ } _%>
   user!: AuthUserDto;
 }

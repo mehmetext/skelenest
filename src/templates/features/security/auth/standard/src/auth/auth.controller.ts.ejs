@@ -1,3 +1,4 @@
+<%_ const includesSwagger = selectedOptionIds.includes('swagger'); _%>
 import {
   Body,
   Controller,
@@ -7,6 +8,7 @@ import {
   Post,
   UseGuards,
 } from "@nestjs/common";
+<%_ if (includesSwagger) { _%>
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
@@ -18,6 +20,7 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from "@nestjs/swagger";
+<%_ } _%>
 import { AuthService } from "./auth.service";
 import { CurrentUser } from "./decorators/current-user.decorator";
 import {
@@ -31,11 +34,14 @@ import { JwtAuthGuard } from "./guards/jwt-auth.guard";
 import { LocalAuthGuard } from "./guards/local-auth.guard";
 import type { AuthenticatedRequestUser } from "./types";
 
+<%_ if (includesSwagger) { _%>
 @ApiTags("Auth")
+<%_ } _%>
 @Controller("auth")
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+<%_ if (includesSwagger) { _%>
   @ApiOperation({ summary: "Register a new user" })
   @ApiCreatedResponse({
     type: AuthResponseDto,
@@ -43,16 +49,19 @@ export class AuthController {
   })
   @ApiBadRequestResponse({ description: "Validation error" })
   @ApiConflictResponse({ description: "Email already registered" })
+<%_ } _%>
   @Post("register")
   register(@Body() dto: RegisterDto): Promise<AuthResponseDto> {
     return this.authService.register(dto);
   }
 
+<%_ if (includesSwagger) { _%>
   @ApiOperation({ summary: "Login with email and password" })
   @ApiBody({ type: LoginDto })
   @ApiOkResponse({ type: AuthResponseDto })
   @ApiUnauthorizedResponse({ description: "Invalid credentials" })
   @ApiBadRequestResponse({ description: "Validation error" })
+<%_ } _%>
   @HttpCode(HttpStatus.OK)
   @UseGuards(LocalAuthGuard)
   login(
@@ -61,21 +70,25 @@ export class AuthController {
     return this.authService.issueAuthResponse(user.id);
   }
 
+<%_ if (includesSwagger) { _%>
   @ApiOperation({ summary: "Refresh access token" })
   @ApiOkResponse({ type: AuthResponseDto })
   @ApiUnauthorizedResponse({ description: "Invalid or expired refresh token" })
   @ApiBadRequestResponse({ description: "Validation error" })
+<%_ } _%>
   @HttpCode(HttpStatus.OK)
   @Post("refresh")
   refresh(@Body() dto: RefreshTokenDto): Promise<AuthResponseDto> {
     return this.authService.refresh(dto.refreshToken);
   }
 
+<%_ if (includesSwagger) { _%>
   @ApiOperation({ summary: "Logout and revoke refresh token" })
   @ApiBearerAuth()
   @ApiOkResponse({ description: "Logged out successfully" })
   @ApiUnauthorizedResponse({ description: "Unauthorized" })
   @ApiBadRequestResponse({ description: "Refresh token is required" })
+<%_ } _%>
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
   @Post("logout")
@@ -91,10 +104,12 @@ export class AuthController {
     );
   }
 
+<%_ if (includesSwagger) { _%>
   @ApiOperation({ summary: "Get current authenticated user" })
   @ApiBearerAuth()
   @ApiOkResponse({ type: AuthUserDto })
   @ApiUnauthorizedResponse({ description: "Unauthorized" })
+<%_ } _%>
   @UseGuards(JwtAuthGuard)
   @Get("me")
   me(@CurrentUser() user: AuthenticatedRequestUser): Promise<AuthUserDto> {

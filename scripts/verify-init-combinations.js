@@ -249,6 +249,29 @@ function verifyFeatureDependencies(blueprint, selectionCase) {
   }
 }
 
+function verifyOptionalFeatureLeakage(blueprint, selectionCase) {
+  const packageJson = JSON.parse(blueprint.templateData.packageJson);
+  const selectedOptionIds = new Set(blueprint.templateData.selectedOptionIds || []);
+
+  if (!selectedOptionIds.has("swagger")) {
+    ensure(
+      !packageJson.dependencies["@nestjs/swagger"],
+      "@nestjs/swagger should not be present when swagger is not selected"
+    );
+  }
+
+  if (!selectedOptionIds.has("redis")) {
+    ensure(
+      !packageJson.dependencies["@nestjs-modules/ioredis"],
+      "@nestjs-modules/ioredis should not be present when redis is not selected"
+    );
+    ensure(
+      !packageJson.dependencies["ioredis"],
+      "ioredis should not be present when redis is not selected"
+    );
+  }
+}
+
 function verifyAuthVariant(outputRoot, selectionCase) {
   if (!selectionCase.modules.includes("auth")) {
     return;
@@ -260,6 +283,7 @@ function verifyAuthVariant(outputRoot, selectionCase) {
       : []
   );
   const includesRedis = effectiveOptionIds.has("redis");
+  const includesSwagger = effectiveOptionIds.has("swagger");
   const schemaPath = path.join(outputRoot, "prisma", "schema.prisma");
   const schema = fs.readFileSync(schemaPath, "utf8");
 
@@ -288,11 +312,19 @@ function verifyAuthVariant(outputRoot, selectionCase) {
   if (selectionCase.architecture === "standard") {
     const authServicePath = path.join(outputRoot, "src", "auth", "auth.service.ts");
     const authService = fs.readFileSync(authServicePath, "utf8");
+    const authControllerPath = path.join(outputRoot, "src", "auth", "auth.controller.ts");
+    const authController = fs.readFileSync(authControllerPath, "utf8");
+    const authDtoPath = path.join(outputRoot, "src", "auth", "dto", "auth.dto.ts");
+    const authDto = fs.readFileSync(authDtoPath, "utf8");
 
     if (includesRedis) {
       ensure(
         authService.includes("@InjectRedis() private readonly redis: Redis"),
         "standard auth must inject redis when redis is selected"
+      );
+      ensure(
+        !authService.includes("private readonly prisma: PrismaService"),
+        "standard auth must not inject prisma when redis is selected"
       );
       ensure(
         !authService.includes("this.prisma.refreshSession"),
@@ -309,12 +341,40 @@ function verifyAuthVariant(outputRoot, selectionCase) {
       );
     }
 
+    if (includesSwagger) {
+      ensure(
+        authController.includes('from "@nestjs/swagger"'),
+        "standard auth controller must include swagger decorators when swagger is selected"
+      );
+      ensure(
+        authDto.includes('from "@nestjs/swagger"'),
+        "standard auth DTO must include swagger decorators when swagger is selected"
+      );
+    } else {
+      ensure(
+        !authController.includes('from "@nestjs/swagger"'),
+        "standard auth controller must not include swagger decorators when swagger is not selected"
+      );
+      ensure(
+        !authDto.includes('from "@nestjs/swagger"'),
+        "standard auth DTO must not include swagger decorators when swagger is not selected"
+      );
+    }
+
     return;
   }
 
   const authBaseDir = path.join(outputRoot, "src", "modules", "auth");
   const authModule = fs.readFileSync(
     path.join(authBaseDir, "auth.module.ts"),
+    "utf8"
+  );
+  const authController = fs.readFileSync(
+    path.join(authBaseDir, "presentation", "http", "auth.controller.ts"),
+    "utf8"
+  );
+  const authDto = fs.readFileSync(
+    path.join(authBaseDir, "application", "dto", "auth.dto.ts"),
     "utf8"
   );
   const prismaAdapterPath = path.join(
@@ -357,11 +417,32 @@ function verifyAuthVariant(outputRoot, selectionCase) {
       `${selectionCase.architecture} auth must wire PrismaAuthSessionStoreAdapter when redis is not selected`
     );
   }
+
+  if (includesSwagger) {
+    ensure(
+      authController.includes("from '@nestjs/swagger'"),
+      `${selectionCase.architecture} auth controller must include swagger decorators when swagger is selected`
+    );
+    ensure(
+      authDto.includes("from '@nestjs/swagger'"),
+      `${selectionCase.architecture} auth DTO must include swagger decorators when swagger is selected`
+    );
+  } else {
+    ensure(
+      !authController.includes("from '@nestjs/swagger'"),
+      `${selectionCase.architecture} auth controller must not include swagger decorators when swagger is not selected`
+    );
+    ensure(
+      !authDto.includes("from '@nestjs/swagger'"),
+      `${selectionCase.architecture} auth DTO must not include swagger decorators when swagger is not selected`
+    );
+  }
 }
 
 async function verifySuccessfulCase(selectionCase, options = {}) {
   const blueprint = createInitBlueprint(createPromptData(selectionCase));
   verifyFeatureDependencies(blueprint, selectionCase);
+  verifyOptionalFeatureLeakage(blueprint, selectionCase);
   const effectiveSelectionCase = {
     ...selectionCase,
     selectedOptionIds: blueprint.templateData.selectedOptionIds || [],

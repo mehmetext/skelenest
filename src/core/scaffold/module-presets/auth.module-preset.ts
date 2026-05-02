@@ -33,6 +33,7 @@ export const authModulePreset: ModulePresetDefinition<InitPromptData> = {
   resolveContribution(input) {
     const { architecture } = input;
     const includesRedis = input.context.has("redis");
+    const includesSwagger = input.context.has("swagger");
     const usersContribution = usersModulePreset.resolveContribution(input);
 
     return {
@@ -95,7 +96,11 @@ export const authModulePreset: ModulePresetDefinition<InitPromptData> = {
           ...(usersContribution.packageJson?.dependencies ?? {}),
           "@nestjs/jwt": "^11.0.1",
           "@nestjs/passport": "^11.0.5",
-          "@nestjs/swagger": "^11.4.2",
+          ...(includesSwagger
+            ? {
+                "@nestjs/swagger": "^11.4.2",
+              }
+            : {}),
           passport: "^0.7.0",
           "passport-jwt": "^4.0.1",
           "passport-local": "^1.0.0",
