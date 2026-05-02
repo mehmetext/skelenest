@@ -1,4 +1,8 @@
 import { NestFactory } from "@nestjs/core";
+<%_ const includesSwagger = selectedOptionIds.includes('swagger'); _%>
+<%_ if (includesSwagger) { _%>
+import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
+<%_ } _%>
 <%
 const mainImports = getSlot('main.imports');
 const mainBootstrapStatements = getSlot('main.bootstrap');
@@ -13,6 +17,23 @@ async function bootstrap() {
     throw new Error("PORT is not set");
   }
   const app = await NestFactory.create(AppModule);
+<%_ if (includesSwagger) { _%>
+
+  const config = new DocumentBuilder()
+    .setTitle('<%= projectDisplayName %>')
+    .setDescription('<%= projectDisplayName %> API description')
+    .setVersion('1.0')
+    .addTag('<%= name %>')
+    .addBearerAuth()
+    .build();
+
+  const documentFactory = () => SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api/docs', app, documentFactory, {
+    swaggerOptions: {
+      persistAuthorization: true,
+    },
+  });
+<%_ } _%>
 <%_ if (mainBootstrapStatements.length > 0) { _%>
 <%- mainBootstrapStatements.map((statement) => `  ${statement}`).join('\n') %>
 <%_ } _%>

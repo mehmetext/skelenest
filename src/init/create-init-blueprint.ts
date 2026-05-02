@@ -114,6 +114,7 @@ export function createInitBlueprint(
     templateRoots: [baseTemplateRoot],
     templateData: {
       name: data.name,
+      projectDisplayName,
       port: data.port,
       helloMessage,
       pmInstallCommand: selectedPackageManager.pmInstallCommand,
