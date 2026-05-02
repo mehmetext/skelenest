@@ -1,8 +1,12 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-<% for (const statement of getSlot('app.module.imports')) { %>
-<%- statement %>
-<% } %>
+<%
+const appModuleImports = getSlot('app.module.imports');
+const appModuleEntries = getSlot('app.module.moduleImports');
+-%>
+<%_ if (appModuleImports.length > 0) { _%>
+<%- appModuleImports.join('\n') %>
+<%_ } _%>
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -11,9 +15,9 @@ import { AppService } from './app.service';
     ConfigModule.forRoot({
       isGlobal: true,
     }),
-<% for (const moduleImport of getSlot('app.module.moduleImports')) { %>
-    <%- moduleImport %>,
-<% } %>
+<%_ if (appModuleEntries.length > 0) { _%>
+<%- appModuleEntries.map((moduleImport) => `    ${moduleImport},`).join('\n') %>
+<%_ } _%>
   ],
   controllers: [AppController],
   providers: [AppService],

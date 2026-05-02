@@ -19,7 +19,7 @@ export const ormOptions: TechnologyOption<InitPromptData>[] = [
         "app.module.moduleImports": ["PrismaModule"],
         "gitignore.entries": ["src/generated/prisma"],
         "env.entries": [
-          `DATABASE_URL="postgresql://postgres:postgres@localhost:5432/${context.name}-db"`,
+          `DATABASE_URL="postgresql://postgres:postgres@${context.has("docker") ? "postgres" : "localhost"}:5432/${context.input.name}-db"`,
         ],
       },
       packageJson: {
@@ -53,7 +53,7 @@ export const ormOptions: TechnologyOption<InitPromptData>[] = [
         ],
         "app.module.moduleImports": ["TypeOrmModule.forRoot(typeOrmConfig)"],
         "env.entries": [
-          `DATABASE_URL="postgresql://postgres:postgres@localhost:5432/${context.name}-db"`,
+          `DATABASE_URL="postgresql://postgres:postgres@${context.has("docker") ? "postgres" : "localhost"}:5432/${context.input.name}-db"`,
         ],
       },
       packageJson: {
@@ -79,7 +79,7 @@ export const ormOptions: TechnologyOption<InitPromptData>[] = [
           "SequelizeModule.forRoot(sequelizeConfig)",
         ],
         "env.entries": [
-          `DATABASE_URL="postgresql://postgres:postgres@localhost:5432/${context.name}-db"`,
+          `DATABASE_URL="postgresql://postgres:postgres@${context.has("docker") ? "postgres" : "localhost"}:5432/${context.input.name}-db"`,
         ],
       },
       packageJson: {

@@ -1,28 +1,20 @@
-import { ScaffoldingContribution, SelectionValues } from "../blueprints/types";
+import { ScaffoldingContribution } from "../blueprints/types";
+import { ResolvedSelectionState } from "./resolve-selection-state";
 import { SelectionGroupDefinition } from "./types";
 
 export interface ResolveSelectedContributionsOptions<TContext> {
-  context: TContext;
   selectionGroups: SelectionGroupDefinition<TContext>[];
-  selections: SelectionValues;
+  selectionState: ResolvedSelectionState<TContext>;
+  context: TContext;
 }
 
 export function resolveSelectedContributions<TContext>(
   options: ResolveSelectedContributionsOptions<TContext>
 ): ScaffoldingContribution[] {
-  const { context, selectionGroups, selections } = options;
+  const { context, selectionState } = options;
+  const contributionContext = selectionState.createContext(context);
 
-  return selectionGroups.flatMap((group) => {
-    const rawValue = selections[group.id];
-    const selectedIds = Array.isArray(rawValue)
-      ? rawValue
-      : rawValue
-      ? [rawValue]
-      : [];
-
-    return selectedIds
-      .map((selectedId) => group.options.find((option) => option.id === selectedId))
-      .filter((option): option is NonNullable<typeof option> => Boolean(option))
-      .map((option) => option.contribute(context));
-  });
+  return selectionState.selectedTechnologies.map(({ option }) =>
+    option.contribute(contributionContext)
+  );
 }

@@ -1,0 +1,22 @@
+FROM node:22-alpine AS base
+WORKDIR /usr/src/app
+
+COPY package.json ./
+<% if (selectedOptionIds.includes('prisma')) { %>
+COPY prisma ./prisma
+<% } %>
+
+RUN corepack enable
+RUN <%= pmInstallCommand %>
+
+COPY . .
+
+<% if (selectedOptionIds.includes('prisma')) { %>
+RUN <%= pmRunCommandPrefix %> prisma:generate
+<% } %>
+
+RUN <%= pmRunCommandPrefix %> build
+
+EXPOSE <%= port %>
+
+CMD ["sh", "-c", "<%= pmRunCommandPrefix %> start:prod"]

@@ -1,0 +1,66 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: <%= name %>-app
+<% if (docker.includesDatabase || docker.includesRedis) { %>
+    depends_on:
+<% if (docker.includesDatabase) { %>
+      postgres:
+        condition: service_healthy
+<% } %>
+<% if (docker.includesRedis) { %>
+      redis:
+        condition: service_started
+<% } %>
+<% } %>
+    env_file:
+      - .env
+    ports:
+      - "<%= port %>:<%= port %>"
+    command: sh -c "<%= pmRunCommandPrefix %> start:dev"
+    volumes:
+      - .:/usr/src/app
+      - /usr/src/app/node_modules
+
+<% if (docker.includesDatabase) { %>
+  postgres:
+    image: postgres:16-alpine
+    container_name: <%= name %>-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: <%= name %>-db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d <%= name %>-db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+<% } %>
+
+<% if (docker.includesRedis) { %>
+  redis:
+    image: redis:7-alpine
+    container_name: <%= name %>-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+<% } %>
+
+<% if (docker.includesDatabase || docker.includesRedis) { %>
+volumes:
+<% if (docker.includesDatabase) { %>
+  postgres-data:
+<% } %>
+<% if (docker.includesRedis) { %>
+  redis-data:
+<% } %>
+<% } %>

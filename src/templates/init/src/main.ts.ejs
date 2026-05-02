@@ -1,4 +1,11 @@
 import { NestFactory } from "@nestjs/core";
+<%
+const mainImports = getSlot('main.imports');
+const mainBootstrapStatements = getSlot('main.bootstrap');
+-%>
+<%_ if (mainImports.length > 0) { _%>
+<%- mainImports.join('\n') %>
+<%_ } _%>
 import { AppModule } from "./app.module";
 
 async function bootstrap() {
@@ -6,6 +13,9 @@ async function bootstrap() {
     throw new Error("PORT is not set");
   }
   const app = await NestFactory.create(AppModule);
+<%_ if (mainBootstrapStatements.length > 0) { _%>
+<%- mainBootstrapStatements.map((statement) => `  ${statement}`).join('\n') %>
+<%_ } _%>
   await app.listen(process.env.PORT);
 }
 void bootstrap();

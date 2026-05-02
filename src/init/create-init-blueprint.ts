@@ -2,6 +2,7 @@ import path from "path";
 import {
   composeScaffoldingBlueprint,
   PackageJsonShape,
+  resolveSelectionState,
   resolveSelectedContributions,
   ScaffoldingBlueprint,
   ScaffoldingContribution,
@@ -104,6 +105,10 @@ export function createInitBlueprint(
 
   const projectDisplayName = formatProjectDisplayName(data.name);
   const helloMessage = `Welcome to ${projectDisplayName}!`;
+  const selectionState = resolveSelectionState({
+    selectionGroups: initSelectionGroups,
+    selections: data.selections,
+  });
 
   const baseContribution: ScaffoldingContribution = {
     templateRoots: [baseTemplateRoot],
@@ -115,13 +120,14 @@ export function createInitBlueprint(
       pmRunCommandPrefix: selectedPackageManager.pmRunCommand,
       pmGlobalInstallCommandPrefix:
         selectedPackageManager.pmGlobalInstallCommand,
+      selectedOptionIds: selectionState.selectedOptionIds,
     },
   };
 
   const selectedContributions = resolveSelectedContributions({
     context: data,
     selectionGroups: initSelectionGroups,
-    selections: data.selections,
+    selectionState,
   });
 
   return composeScaffoldingBlueprint({
@@ -133,6 +139,15 @@ export function createInitBlueprint(
       packageJson,
     }) => ({
       ...templateData,
+      selectionSummary: {
+        orm:
+          selectionState.selectedTechnologies.find(
+            (technology) => technology.groupId === "orm"
+          )?.option.label ?? null,
+        features: selectionState.selectedTechnologies
+          .filter((technology) => technology.groupId === "features")
+          .map((technology) => technology.option.label),
+      },
       packageJson: `${JSON.stringify(packageJson, null, 2)}\n`,
     }),
   });
