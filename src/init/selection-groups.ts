@@ -17,6 +17,7 @@ export const initSelectionGroups: SelectionGroupDefinition<InitPromptData>[] = [
     id: "features",
     message: "Select features to include (press Space to toggle):",
     type: "multi",
+    required: false,
     options: featureOptions,
     initialValue: [],
   },

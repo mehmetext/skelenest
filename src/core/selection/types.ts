@@ -25,6 +25,7 @@ export interface SelectionGroupDefinition<TContext> {
   message: string;
   type: "single" | "multi";
   options: TechnologyOption<TContext>[];
+  required?: boolean;
   allowNone?: boolean;
   noneOptionLabel?: string;
   initialValue?: SelectionValue;

@@ -23,6 +23,7 @@ async function renderSelectionGroup<TContext>(
   if (selectionGroup.type === "multi") {
     const selection = await multiselect({
       message: selectionGroup.message,
+      required: selectionGroup.required ?? true,
       initialValues: Array.isArray(selectionGroup.initialValue)
         ? selectionGroup.initialValue
         : undefined,
