@@ -1,5 +1,9 @@
+<%_ const includesRedis = selectedOptionIds.includes('redis'); _%>
+<%_ if (includesRedis) { _%>
+import { RedisModule } from '@nestjs-modules/ioredis';
+<%_ } _%>
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule<%_ if (includesRedis) { _%>, ConfigService<%_ } _%> } from '@nestjs/config';
 <%
 const appModuleImports = getSlot('app.module.imports');
 const appModuleEntries = getSlot('app.module.moduleImports');
@@ -15,6 +19,18 @@ import { AppService } from './app.service';
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+<%_ if (includesRedis) { _%>
+    RedisModule.forRootAsync({
+      useFactory: (configService: ConfigService) => ({
+        type: 'single',
+        url: configService.getOrThrow('REDIS_URL'),
+        options: {
+          keyPrefix: '<%= name %>:',
+        },
+      }),
+      inject: [ConfigService],
+    }),
+<%_ } _%>
 <%_ if (appModuleEntries.length > 0) { _%>
 <%- appModuleEntries.map((moduleImport) => `    ${moduleImport},`).join('\n') %>
 <%_ } _%>

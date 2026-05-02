@@ -33,6 +33,12 @@ export const featureOptions: TechnologyOption<InitPromptData>[] = [
     label: "Redis",
     description: "Adds REDIS_URL and shared Redis runtime settings",
     contribute: (context) => ({
+      packageJson: {
+        dependencies: {
+          "@nestjs-modules/ioredis": "^2.2.1",
+          ioredis: "^5.10.1",
+        },
+      },
       slots: {
         "env.entries": [
           `REDIS_URL="redis://${context.has("docker") ? "redis" : "localhost"}:6379"`,
