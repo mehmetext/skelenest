@@ -157,6 +157,19 @@ Use `pnpm release:dry` first if you want to preview the npm package contents wit
 
 Make sure you are logged into npm and ready to publish before running the real release commands.
 
+Quick workflow after a change:
+
+```bash
+git add .
+git commit -m "feat: add x"
+git push origin main
+pnpm release:minor
+```
+
+Use `release:patch` for fixes and small updates, `release:minor` for new features, and `release:major` for breaking changes.
+
+These release commands also create a git tag via `npm version` and push it to GitHub with `--follow-tags`.
+
 ## Project structure
 
 - `bin/skelenest.ts`: CLI entrypoint
