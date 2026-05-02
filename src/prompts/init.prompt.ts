@@ -53,6 +53,11 @@ export class InitPrompt extends BasePrompt<InitPromptData> {
             message: "Do you want to install dependencies?",
             initialValue: true,
           }),
+        initializeGit: () =>
+          confirm({
+            message: "Do you want to initialize git and create the first commit?",
+            initialValue: true,
+          }),
       },
       {
         onCancel: () => {
@@ -67,6 +72,7 @@ export class InitPrompt extends BasePrompt<InitPromptData> {
       port: answers.port as string,
       packageManager: answers.packageManager as PackageManager["id"],
       installDependencies: answers.installDependencies as boolean,
+      initializeGit: answers.initializeGit as boolean,
       selections: Object.fromEntries(
         initSelectionGroups.map((selectionGroup) => [
           selectionGroup.id,

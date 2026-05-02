@@ -6,6 +6,7 @@ import { createInitBlueprint, InitPromptData } from "../init";
 import {
   assertTargetDirectoryEmpty,
   copyTemplateTree,
+  initializeGitRepository,
   runPackageManagerInstall,
 } from "../utils";
 import { BaseScaffolder } from "./base.scaffolder";
@@ -46,6 +47,19 @@ export class InitScaffolder extends BaseScaffolder {
         console.log(chalk.green("Dependencies installed successfully."));
       } catch (error) {
         console.log(chalk.red("Dependency installation failed."));
+        throw error;
+      }
+    }
+
+    if (this.data.initializeGit) {
+      const sGit = spinner();
+      sGit.start(`Setting up git repository...`);
+      try {
+        sGit.stop("Git repository setup started.");
+        await initializeGitRepository(targetDir);
+        console.log(chalk.green("Git repository is ready."));
+      } catch (error) {
+        console.log(chalk.red("Git repository setup failed."));
         throw error;
       }
     }

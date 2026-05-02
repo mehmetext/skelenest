@@ -6,5 +6,6 @@ export interface InitPromptData {
   port: string;
   packageManager: PackageManager["id"];
   installDependencies: boolean;
+  initializeGit: boolean;
   selections: SelectionValues;
 }
