@@ -1,9 +1,13 @@
 <%_ const includesRedis = selectedOptionIds.includes('redis'); _%>
+<%_ const includesBullmq = selectedOptionIds.includes('bullmq'); _%>
 <%_ if (includesRedis) { _%>
 import { RedisModule } from '@nestjs-modules/ioredis';
 <%_ } _%>
+<%_ if (includesBullmq) { _%>
+import { BullModule } from '@nestjs/bullmq';
+<%_ } _%>
 import { Module } from '@nestjs/common';
-import { ConfigModule<%_ if (includesRedis) { _%>, ConfigService<%_ } _%> } from '@nestjs/config';
+import { ConfigModule<%_ if (includesRedis || includesBullmq) { _%>, ConfigService<%_ } _%> } from '@nestjs/config';
 <%
 const appModuleImports = getSlot('app.module.imports');
 const appModuleEntries = getSlot('app.module.moduleImports');
@@ -26,6 +30,17 @@ import { AppService } from './app.service';
         url: configService.getOrThrow('REDIS_URL'),
         options: {
           keyPrefix: '<%= name %>:',
+        },
+      }),
+      inject: [ConfigService],
+    }),
+<%_ } _%>
+<%_ if (includesBullmq) { _%>
+    BullModule.forRootAsync({
+      useFactory: (configService: ConfigService) => ({
+        connection: {
+          keyPrefix: '<%= name %>:',
+          url: configService.getOrThrow('REDIS_URL'),
         },
       }),
       inject: [ConfigService],

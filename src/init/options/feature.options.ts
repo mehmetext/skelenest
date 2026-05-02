@@ -52,21 +52,10 @@ export const featureOptions: TechnologyOption<InitPromptData>[] = [
     description: "Adds queue infrastructure and automatically includes Redis",
     requires: ["redis"],
     contribute: () => ({
-      templateRoots: [featureTemplateRoot("queue", "bullmq")],
-      slots: {
-        "app.module.imports": [
-          "import { BullModule } from '@nestjs/bullmq';",
-          "import { QueueModule } from './queue/queue.module';",
-        ],
-        "app.module.moduleImports": [
-          "BullModule.forRoot({ connection: { url: process.env.REDIS_URL } })",
-          "QueueModule",
-        ],
-      },
       packageJson: {
         dependencies: {
-          "@nestjs/bullmq": "^11.0.2",
-          bullmq: "^5.58.0",
+          "@nestjs/bullmq": "^11.0.4",
+          bullmq: "^5.76.4",
         },
       },
     }),
