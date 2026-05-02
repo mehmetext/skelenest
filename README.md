@@ -2,6 +2,42 @@
 
 An opinionated command-line scaffolding tool for NestJS projects. It collects the project name, port, package manager, and stack selections through interactive prompts; generates files from EJS templates; merges `package.json` dependencies; and optionally runs dependency installation.
 
+## Install
+
+Run directly with `npx`:
+
+```bash
+npx skelenest init
+```
+
+Or install globally:
+
+```bash
+npm install -g skelenest
+skelenest init
+```
+
+With `pnpm`:
+
+```bash
+pnpm dlx skelenest init
+```
+
+## Quick start
+
+Create a new NestJS project from your current directory:
+
+```bash
+npx skelenest init
+```
+
+Then move into the generated project and start development:
+
+```bash
+cd <project-name>
+pnpm run start:dev
+```
+
 ## Features
 
 - **Interactive setup**: Project name, HTTP port, package manager, ORM selection, and multi-select feature selection via [@clack/prompts](https://github.com/natemoo-re/clack).
@@ -51,7 +87,13 @@ The `dev:init` script in `package.json` (`pnpm build && skelenest init`) assumes
 
 ## Usage
 
-After a build, locally:
+From the published package:
+
+```bash
+npx skelenest init
+```
+
+After a local build:
 
 ```bash
 pnpm start init

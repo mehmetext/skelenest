@@ -1,6 +1,6 @@
 {
   "name": "skelenest",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "An opinionated CLI for scaffolding NestJS projects",
   "scripts": {
     "dev": "rm -rf dist && tsx watch bin/skelenest.ts",
@@ -23,7 +23,7 @@
     "scaffold",
     "boilerplate"
   ],
-  "author": "",
+  "author": "Mehmet Konukcu <mehmetext68@gmail.com>",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/mehmetext/skelenest.git"
