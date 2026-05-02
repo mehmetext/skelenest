@@ -4,6 +4,8 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: <%= name %>-app
+    networks:
+      - internal
 <% if (docker.includesDatabase || docker.includesRedis) { %>
     depends_on:
 <% if (docker.includesDatabase) { %>
@@ -12,8 +14,12 @@ services:
 <% } %>
 <% if (docker.includesRedis) { %>
       redis:
-        condition: service_started
+        condition: service_healthy
 <% } %>
+<% } %>
+<% if (docker.includesRedis) { %>
+    environment:
+      REDIS_URL: redis://redis:6379
 <% } %>
     env_file:
       - .env
@@ -28,6 +34,8 @@ services:
   postgres:
     image: postgres:16-alpine
     container_name: <%= name %>-postgres
+    networks:
+      - internal
     restart: unless-stopped
     environment:
       POSTGRES_DB: <%= name %>-db
@@ -48,12 +56,23 @@ services:
   redis:
     image: redis:7-alpine
     container_name: <%= name %>-redis
+    networks:
+      - internal
     restart: unless-stopped
     ports:
       - "6379:6379"
     volumes:
       - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 <% } %>
+
+networks:
+  internal:
+    driver: bridge
 
 <% if (docker.includesDatabase || docker.includesRedis) { %>
 volumes:
