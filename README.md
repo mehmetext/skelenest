@@ -11,6 +11,7 @@ Instead of starting from a blank Nest app and wiring everything by hand, `skelen
 - Lets you choose an ORM: `Prisma`, `TypeORM`, `Sequelize`, or none
 - Lets you enable optional features such as `Docker`, `Redis`, `BullMQ`, `Swagger`, `Throttler`, and an auth starter
 - Merges dependencies and scripts based on your selections
+- Sets up request validation defaults with Nest's global `ValidationPipe`
 - Can install dependencies for you after generation
 
 ## Install
@@ -59,6 +60,8 @@ pnpm run start:dev
 ```
 
 The generated project includes its own scripts, so after that point you work inside the new NestJS app as usual.
+
+By default, generated apps also include `class-validator` and `class-transformer`, and configure a global `ValidationPipe` with `whitelist`, `forbidNonWhitelisted`, `transform`, implicit conversion, and `stopAtFirstError`.
 
 ## Command
 
