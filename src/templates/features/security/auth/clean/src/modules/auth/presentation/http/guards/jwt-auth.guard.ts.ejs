@@ -1,9 +1,7 @@
 import { Inject, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import {
-  AUTH_SESSION_STORE,
-  AuthSessionStore,
-} from '../../../application/ports/auth-session-store.port';
+import { AUTH_SESSION_STORE } from '../../../application/ports/auth-session-store.port';
+import type { AuthSessionStore } from '../../../application/ports/auth-session-store.port';
 import type { AuthenticatedRequestUser } from '../../../types';
 
 @Injectable()

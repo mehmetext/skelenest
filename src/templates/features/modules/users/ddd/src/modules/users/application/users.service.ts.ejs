@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
-import {
+import { USERS_REPOSITORY } from './ports/users-repository.port';
+import type {
   CreateUserInput,
-  USERS_REPOSITORY,
   UsersRepository,
 } from './ports/users-repository.port';
 import type { UserEntity } from '../domain/entities/user.entity';

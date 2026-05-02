@@ -1,10 +1,8 @@
 import { Inject, Injectable, BadRequestException, ConflictException } from '@nestjs/common';
 import { UsersService } from '../../../users/application/users.service';
 import type { AuthResponseDto, RegisterDto } from '../dto/auth.dto';
-import {
-  PASSWORD_HASHER,
-  PasswordHasher,
-} from '../ports/password-hasher.port';
+import { PASSWORD_HASHER } from '../ports/password-hasher.port';
+import type { PasswordHasher } from '../ports/password-hasher.port';
 import { AuthTokenOrchestratorService } from '../services/auth-token-orchestrator.service';
 import { AuthUserMapperService } from '../services/auth-user-mapper.service';
 

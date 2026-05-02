@@ -1,13 +1,9 @@
 import type { User } from 'src/generated/prisma/client';
 import { Inject, Injectable } from '@nestjs/common';
-import {
-  AUTH_SESSION_STORE,
-  AuthSessionStore,
-} from '../ports/auth-session-store.port';
-import {
-  AUTH_TOKEN_SERVICE,
-  AuthTokenService,
-} from '../ports/auth-token-service.port';
+import { AUTH_SESSION_STORE } from '../ports/auth-session-store.port';
+import type { AuthSessionStore } from '../ports/auth-session-store.port';
+import { AUTH_TOKEN_SERVICE } from '../ports/auth-token-service.port';
+import type { AuthTokenService } from '../ports/auth-token-service.port';
 
 @Injectable()
 export class AuthTokenOrchestratorService {

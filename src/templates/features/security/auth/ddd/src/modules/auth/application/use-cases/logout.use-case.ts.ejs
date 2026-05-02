@@ -1,8 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
-import {
-  AUTH_SESSION_STORE,
-  AuthSessionStore,
-} from '../ports/auth-session-store.port';
+import { AUTH_SESSION_STORE } from '../ports/auth-session-store.port';
+import type { AuthSessionStore } from '../ports/auth-session-store.port';
 
 @Injectable()
 export class LogoutUseCase {

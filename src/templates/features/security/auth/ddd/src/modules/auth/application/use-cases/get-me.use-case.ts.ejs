@@ -1,10 +1,8 @@
 import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { UsersService } from '../../../users/application/users.service';
 import type { AuthUserDto } from '../dto/auth.dto';
-import {
-  AUTH_SESSION_STORE,
-  AuthSessionStore,
-} from '../ports/auth-session-store.port';
+import { AUTH_SESSION_STORE } from '../ports/auth-session-store.port';
+import type { AuthSessionStore } from '../ports/auth-session-store.port';
 import { AuthUserMapperService } from '../services/auth-user-mapper.service';
 
 @Injectable()
