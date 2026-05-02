@@ -7,6 +7,7 @@ import {
   assertTargetDirectoryEmpty,
   copyTemplateTree,
   initializeGitRepository,
+  runPackageManagerFormat,
   runPackageManagerInstall,
 } from "../utils";
 import { BaseScaffolder } from "./base.scaffolder";
@@ -48,6 +49,20 @@ export class InitScaffolder extends BaseScaffolder {
       } catch (error) {
         console.log(chalk.red("Dependency installation failed."));
         throw error;
+      }
+
+      const sFormat = spinner();
+      sFormat.start(`Formatting generated project...`);
+      try {
+        sFormat.stop("Formatting started.");
+        await runPackageManagerFormat(targetDir, this.data.packageManager);
+        console.log(chalk.green("Generated project formatted successfully."));
+      } catch (error) {
+        console.log(
+          chalk.yellow(
+            "Generated project formatting failed. Project files were still created successfully."
+          )
+        );
       }
     }
 
