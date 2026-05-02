@@ -41,9 +41,11 @@ export class InitScaffolder extends BaseScaffolder {
       const sDependencies = spinner();
       sDependencies.start(`Installing dependencies...`);
       try {
+        sDependencies.stop("Dependency installation started.");
         await runPackageManagerInstall(targetDir, this.data.packageManager);
+        console.log(chalk.green("Dependencies installed successfully."));
       } catch (error) {
-        sDependencies.stop("Dependency installation failed.");
+        console.log(chalk.red("Dependency installation failed."));
         throw error;
       }
     }

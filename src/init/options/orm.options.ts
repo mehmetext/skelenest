@@ -6,32 +6,37 @@ import { InitPromptData } from "../types";
 const ormTemplateRoot = (...segments: string[]): string =>
   path.join(resolveTemplatesRoot(__dirname), "features", "orm", ...segments);
 
-const defaultDatabaseUrl =
-  'DATABASE_URL="postgresql://postgres:postgres@localhost:5432/app"';
-
 export const ormOptions: TechnologyOption<InitPromptData>[] = [
   {
     id: "prisma",
     label: "Prisma",
-    contribute: () => ({
+    contribute: (context) => ({
       templateRoots: [ormTemplateRoot("prisma")],
       slots: {
         "app.module.imports": [
           "import { PrismaModule } from './prisma/prisma.module';",
         ],
         "app.module.moduleImports": ["PrismaModule"],
-        "env.entries": [defaultDatabaseUrl],
+        "gitignore.entries": ["src/generated/prisma"],
+        "env.entries": [
+          `DATABASE_URL="postgresql://postgres:postgres@localhost:5432/${context.name}-db"`,
+        ],
       },
       packageJson: {
         dependencies: {
-          "@prisma/client": "^6.7.0",
+          "@prisma/adapter-pg": "^7.8.0",
+          "@prisma/client": "^7.8.0",
         },
         devDependencies: {
-          prisma: "^6.7.0",
+          prisma: "^7.8.0",
         },
         scripts: {
-          "prisma:generate": "prisma generate",
-          "prisma:migrate:dev": "prisma migrate dev",
+          "prisma:generate": "prisma generate --schema=prisma/schema.prisma",
+          "prisma:migrate": "prisma migrate dev --schema=prisma/schema.prisma",
+          "prisma:migrate:deploy":
+            "prisma migrate deploy --schema=prisma/schema.prisma",
+          "prisma:push": "prisma db push --schema=prisma/schema.prisma",
+          "prisma:studio": "prisma studio",
         },
       },
     }),
@@ -39,7 +44,7 @@ export const ormOptions: TechnologyOption<InitPromptData>[] = [
   {
     id: "typeorm",
     label: "TypeORM",
-    contribute: () => ({
+    contribute: (context) => ({
       templateRoots: [ormTemplateRoot("typeorm")],
       slots: {
         "app.module.imports": [
@@ -47,7 +52,9 @@ export const ormOptions: TechnologyOption<InitPromptData>[] = [
           "import { typeOrmConfig } from './database/typeorm.config';",
         ],
         "app.module.moduleImports": ["TypeOrmModule.forRoot(typeOrmConfig)"],
-        "env.entries": [defaultDatabaseUrl],
+        "env.entries": [
+          `DATABASE_URL="postgresql://postgres:postgres@localhost:5432/${context.name}-db"`,
+        ],
       },
       packageJson: {
         dependencies: {
@@ -61,15 +68,19 @@ export const ormOptions: TechnologyOption<InitPromptData>[] = [
   {
     id: "sequelize",
     label: "Sequelize",
-    contribute: () => ({
+    contribute: (context) => ({
       templateRoots: [ormTemplateRoot("sequelize")],
       slots: {
         "app.module.imports": [
           "import { SequelizeModule } from '@nestjs/sequelize';",
           "import { sequelizeConfig } from './database/sequelize.config';",
         ],
-        "app.module.moduleImports": ["SequelizeModule.forRoot(sequelizeConfig)"],
-        "env.entries": [defaultDatabaseUrl],
+        "app.module.moduleImports": [
+          "SequelizeModule.forRoot(sequelizeConfig)",
+        ],
+        "env.entries": [
+          `DATABASE_URL="postgresql://postgres:postgres@localhost:5432/${context.name}-db"`,
+        ],
       },
       packageJson: {
         dependencies: {
