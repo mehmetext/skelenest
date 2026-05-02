@@ -1,4 +1,6 @@
-# skelenest
+<p align="center">
+  <img src="assets/logo.png" alt="Skelenest Logo" width="320" />
+</p>
 
 `skelenest` is an opinionated CLI for scaffolding and growing NestJS projects.
 

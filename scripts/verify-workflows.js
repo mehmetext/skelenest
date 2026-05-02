@@ -132,10 +132,78 @@ async function verifyGenerateCommands() {
   }
 }
 
+function verifyNonInteractiveInit() {
+  const workspaceDir = fs.mkdtempSync(
+    path.join(os.tmpdir(), "skelenest-init-flags-")
+  );
+
+  try {
+    runCli(workspaceDir, [
+      "init",
+      "--name",
+      "flag-app",
+      "--port",
+      "4100",
+      "--package-manager",
+      "pnpm",
+      "--orm",
+      "prisma",
+      "--architecture",
+      "clean",
+      "--features",
+      "swagger,bullmq",
+      "--modules",
+      "auth",
+      "--no-install",
+      "--no-git",
+    ]);
+
+    const projectDir = path.join(workspaceDir, "flag-app");
+    const packageJson = JSON.parse(
+      fs.readFileSync(path.join(projectDir, "package.json"), "utf8")
+    );
+    const projectMetadata = JSON.parse(
+      fs.readFileSync(
+        path.join(projectDir, ".skelenest", "project.json"),
+        "utf8"
+      )
+    );
+    const envFile = fs.readFileSync(path.join(projectDir, ".env"), "utf8");
+
+    ensure(
+      fs.existsSync(path.join(projectDir, ".skelenest", "project.json")),
+      "non-interactive init should create project metadata"
+    );
+    ensure(
+      packageJson.packageManager === "pnpm@10.28.0",
+      "non-interactive init should persist the selected package manager"
+    );
+    ensure(
+      projectMetadata.architecture === "clean" &&
+        projectMetadata.orm === "prisma",
+      "non-interactive init should persist selected architecture and ORM"
+    );
+    ensure(
+      projectMetadata.features.includes("bullmq") &&
+        projectMetadata.modules.includes("auth"),
+      "non-interactive init should persist selected features and modules"
+    );
+    ensure(
+      envFile.includes('PORT="4100"') || envFile.includes("PORT=4100"),
+      "non-interactive init should persist the selected port"
+    );
+  } finally {
+    fs.rmSync(workspaceDir, { recursive: true, force: true });
+  }
+}
+
 async function main() {
   await verifyDoctorJsonOutput();
   await verifyGenerateCommands();
-  console.log("Verified doctor JSON output and generate command workflows.");
+  verifyNonInteractiveInit();
+  console.log(
+    "Verified doctor JSON output, generate command workflows, and non-interactive init."
+  );
 }
 
 main().catch((error) => {
