@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { Command } from "commander";
-import { InitCommand } from "../src/commands";
+import { GenerateCommand, InitCommand } from "../src/commands";
 import { printBanner } from "../src/utils";
 
 const program = new Command();
@@ -13,6 +13,7 @@ program
   .version("1.0.0");
 
 program.addCommand(new InitCommand());
+program.addCommand(new GenerateCommand());
 
 program.action(() => {
   program.help();
