@@ -6,11 +6,20 @@ import {
   ScaffoldingBlueprint,
   ScaffoldingContribution,
 } from "../core";
+import { packageManagers } from "../data";
 import { initSelectionGroups } from "./selection-groups";
 import { resolveTemplatesRoot } from "./template-root";
 import { InitPromptData } from "./types";
 
 const baseTemplateRoot = path.join(resolveTemplatesRoot(__dirname), "init");
+
+function formatProjectDisplayName(name: string): string {
+  return name
+    .split(/[-_\s]+/)
+    .filter(Boolean)
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join(" ");
+}
 
 function createBasePackageJson(name: string): PackageJsonShape {
   return {
@@ -85,11 +94,27 @@ function createBasePackageJson(name: string): PackageJsonShape {
 export function createInitBlueprint(
   data: InitPromptData
 ): ScaffoldingBlueprint {
+  const selectedPackageManager = packageManagers.find(
+    (packageManager) => packageManager.id === data.packageManager
+  );
+
+  if (!selectedPackageManager) {
+    throw new Error(`Unsupported package manager: ${data.packageManager}`);
+  }
+
+  const projectDisplayName = formatProjectDisplayName(data.name);
+  const helloMessage = `Welcome to ${projectDisplayName}!`;
+
   const baseContribution: ScaffoldingContribution = {
     templateRoots: [baseTemplateRoot],
     templateData: {
       name: data.name,
       port: data.port,
+      helloMessage,
+      pmInstallCommand: selectedPackageManager.pmInstallCommand,
+      pmRunCommandPrefix: selectedPackageManager.pmRunCommand,
+      pmGlobalInstallCommandPrefix:
+        selectedPackageManager.pmGlobalInstallCommand,
     },
   };
 
