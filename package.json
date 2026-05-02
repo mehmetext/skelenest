@@ -1,6 +1,6 @@
 {
   "name": "skelenest",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "An opinionated CLI for scaffolding NestJS projects",
   "scripts": {
     "dev": "rm -rf dist && tsx watch bin/skelenest.ts",
