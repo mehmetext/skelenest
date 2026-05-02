@@ -45,12 +45,12 @@ export class InitCommand extends BaseCommand {
     );
     this.option(
       "--features <features>",
-      "Comma-separated features, for example swagger,docker,bullmq",
+      "Comma-separated features, or none",
       parseListOption
     );
     this.option(
       "--modules <modules>",
-      "Comma-separated starter modules, for example auth",
+      "Comma-separated starter modules, or none",
       parseListOption
     );
     this.option("--install", "Install dependencies after generation");

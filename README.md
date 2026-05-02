@@ -51,6 +51,23 @@ skelenest doctor --json
 
 `generate` also has the short alias `skelenest g`.
 
+`init` accepts partial or fully non-interactive flags. If you provide only some values, Skelenest uses those and prompts for the rest.
+
+Example:
+
+```bash
+skelenest init \
+  --name my-api \
+  --port 3000 \
+  --package-manager pnpm \
+  --orm prisma \
+  --architecture clean \
+  --features swagger,bullmq \
+  --modules auth \
+  --no-install \
+  --no-git
+```
+
 ## Quick start
 
 Create a project:
@@ -82,6 +99,66 @@ Generated apps include `class-validator`, `class-transformer`, and a global `Val
 
 If Swagger is selected, docs are mounted at `GET /api/docs`.
 
+## Example outputs
+
+### Minimal standard API
+
+Command:
+
+```bash
+skelenest init --name standard-api --port 3000 --package-manager pnpm --orm none --architecture standard --features swagger --modules none --no-install --no-git
+```
+
+Representative output:
+
+```text
+standard-api/
+├── .skelenest/project.json
+├── package.json
+├── src/
+│   ├── app.controller.spec.ts
+│   ├── app.controller.ts
+│   ├── app.module.ts
+│   ├── app.service.ts
+│   └── main.ts
+└── test/
+    ├── app.e2e-spec.ts
+    └── jest-e2e.json
+```
+
+### Clean architecture API with Prisma, BullMQ, and auth
+
+Command:
+
+```bash
+skelenest init --name clean-api --port 3000 --package-manager pnpm --orm prisma --architecture clean --features swagger,bullmq --modules auth --no-install --no-git
+```
+
+Representative output:
+
+```text
+clean-api/
+├── .skelenest/project.json
+├── prisma/
+│   ├── example.prisma
+│   └── schema.prisma
+├── src/
+│   ├── app.module.ts
+│   ├── main.ts
+│   ├── modules/
+│   │   ├── auth/
+│   │   │   ├── application/
+│   │   │   ├── infrastructure/
+│   │   │   └── presentation/
+│   │   └── users/
+│   └── prisma/
+│       ├── prisma.module.ts
+│       └── prisma.service.ts
+└── test/
+    ├── app.e2e-spec.ts
+    └── jest-e2e.json
+```
+
 ## Stack options
 
 ### ORMs
@@ -101,6 +178,19 @@ If Swagger is selected, docs are mounted at `GET /api/docs`.
 - `Auth Starter Module`
 
 Some options are dependency-aware. For example, selecting `BullMQ` automatically pulls in the Redis stack.
+
+## What each choice adds
+
+| Choice | Example values | What gets generated |
+| --- | --- | --- |
+| `--architecture` | `standard`, `clean`, `ddd` | Changes module layout and file structure across the whole app |
+| `--orm` | `prisma`, `typeorm`, `sequelize`, `none` | Adds persistence config, dependencies, env entries, and ORM-specific wiring |
+| `--features swagger` | `swagger` | Wires OpenAPI docs at `GET /api/docs` |
+| `--features redis` | `redis` | Adds Redis dependencies and `REDIS_URL` configuration |
+| `--features bullmq` | `bullmq` | Adds BullMQ and implicitly pulls in the Redis stack |
+| `--features throttler` | `throttler` | Adds global throttling and Redis-backed storage when Redis is selected |
+| `--features docker` | `docker` | Adds `Dockerfile`, `.dockerignore`, and `docker-compose.yml` |
+| `--modules auth` | `auth` | Adds auth and users starter modules tailored to the selected architecture |
 
 ## Generation model
 

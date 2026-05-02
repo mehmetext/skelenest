@@ -105,6 +105,10 @@ function normalizeMultiSelection(
     new Set(values.map((value) => value.trim().toLowerCase()).filter(Boolean))
   );
 
+  if (normalizedValues.length === 1 && normalizedValues[0] === "none") {
+    return [];
+  }
+
   for (const value of normalizedValues) {
     if (!allowedIds.has(value)) {
       throw new Error(
