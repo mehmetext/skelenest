@@ -50,6 +50,8 @@ function createBasePackageJson(name: string): PackageJsonShape {
       "@nestjs/config": "^4.0.4",
       "@nestjs/core": "^11.0.1",
       "@nestjs/platform-express": "^11.0.1",
+      "class-transformer": "^0.5.1",
+      "class-validator": "^0.15.1",
       "reflect-metadata": "^0.2.2",
       rxjs: "^7.8.1",
     },
