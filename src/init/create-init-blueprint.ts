@@ -1,0 +1,114 @@
+import path from "path";
+import {
+  composeScaffoldingBlueprint,
+  PackageJsonShape,
+  resolveSelectedContributions,
+  ScaffoldingBlueprint,
+  ScaffoldingContribution,
+} from "../core";
+import { initSelectionGroups } from "./selection-groups";
+import { resolveTemplatesRoot } from "./template-root";
+import { InitPromptData } from "./types";
+
+const baseTemplateRoot = path.join(resolveTemplatesRoot(__dirname), "init");
+
+function createBasePackageJson(name: string): PackageJsonShape {
+  return {
+    name,
+    version: "0.0.1",
+    description: "",
+    author: "",
+    private: true,
+    license: "UNLICENSED",
+    scripts: {
+      build: "nest build",
+      format: 'prettier --write "src/**/*.ts" "test/**/*.ts"',
+      start: "nest start",
+      "start:dev": "nest start --watch",
+      "start:debug": "nest start --debug --watch",
+      "start:prod": "node dist/main",
+      lint: 'eslint "{src,apps,libs,test}/**/*.ts" --fix',
+      test: "jest",
+      "test:watch": "jest --watch",
+      "test:cov": "jest --coverage",
+      "test:debug":
+        "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
+      "test:e2e": "jest --config ./test/jest-e2e.json",
+    },
+    dependencies: {
+      "@nestjs/common": "^11.0.1",
+      "@nestjs/config": "^4.0.4",
+      "@nestjs/core": "^11.0.1",
+      "@nestjs/platform-express": "^11.0.1",
+      "reflect-metadata": "^0.2.2",
+      rxjs: "^7.8.1",
+    },
+    devDependencies: {
+      "@eslint/eslintrc": "^3.2.0",
+      "@eslint/js": "^9.18.0",
+      "@nestjs/cli": "^11.0.0",
+      "@nestjs/schematics": "^11.0.0",
+      "@nestjs/testing": "^11.0.1",
+      "@types/express": "^5.0.0",
+      "@types/jest": "^30.0.0",
+      "@types/node": "^24.0.0",
+      "@types/supertest": "^7.0.0",
+      eslint: "^9.18.0",
+      "eslint-config-prettier": "^10.0.1",
+      "eslint-plugin-prettier": "^5.2.2",
+      globals: "^17.0.0",
+      jest: "^30.0.0",
+      prettier: "^3.4.2",
+      "source-map-support": "^0.5.21",
+      supertest: "^7.0.0",
+      "ts-jest": "^29.2.5",
+      "ts-loader": "^9.5.2",
+      "ts-node": "^10.9.2",
+      "tsconfig-paths": "^4.2.0",
+      typescript: "^5.7.3",
+      "typescript-eslint": "^8.20.0",
+    },
+    jest: {
+      moduleFileExtensions: ["js", "json", "ts"],
+      rootDir: "src",
+      testRegex: ".*\\.spec\\.ts$",
+      transform: {
+        "^.+\\.(t|j)s$": "ts-jest",
+      },
+      collectCoverageFrom: ["**/*.(t|j)s"],
+      coverageDirectory: "../coverage",
+      testEnvironment: "node",
+    },
+  };
+}
+
+export function createInitBlueprint(
+  data: InitPromptData
+): ScaffoldingBlueprint {
+  const baseContribution: ScaffoldingContribution = {
+    templateRoots: [baseTemplateRoot],
+    templateData: {
+      name: data.name,
+      port: data.port,
+    },
+  };
+
+  const selectedContributions = resolveSelectedContributions({
+    context: data,
+    selectionGroups: initSelectionGroups,
+    selections: data.selections,
+  });
+
+  return composeScaffoldingBlueprint({
+    baseContributions: [baseContribution],
+    selectedContributions,
+    basePackageJson: createBasePackageJson(data.name),
+    finalizeTemplateData: ({
+      templateData,
+      packageJson,
+    }) => ({
+      ...templateData,
+      packageJson: `${JSON.stringify(packageJson, null, 2)}\n`,
+    }),
+  });
+}

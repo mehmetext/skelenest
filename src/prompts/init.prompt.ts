@@ -1,15 +1,16 @@
-import { cancel, confirm, group, intro, select, text } from "@clack/prompts";
+import {
+  cancel,
+  confirm,
+  group,
+  intro,
+  select,
+  text,
+} from "@clack/prompts";
 import chalk from "chalk";
+import { createSelectionGroupPrompts } from "../core";
 import { PackageManager, packageManagers } from "../data";
-import { orms } from "../data/orms";
+import { initSelectionGroups, InitPromptData } from "../init";
 import { BasePrompt } from "./base.prompt";
-
-export interface InitPromptData {
-  name: string;
-  port: string;
-  packageManager: PackageManager["id"];
-  installDependencies: boolean;
-}
 
 export class InitPrompt extends BasePrompt<InitPromptData> {
   constructor() {
@@ -19,7 +20,9 @@ export class InitPrompt extends BasePrompt<InitPromptData> {
   async execute(): Promise<InitPromptData> {
     intro(chalk.bgCyanBright.white(" skelenest "));
 
-    const data = await group(
+    const selectionPrompts = createSelectionGroupPrompts(initSelectionGroups);
+
+    const answers = (await group(
       {
         name: () =>
           text({
@@ -44,17 +47,7 @@ export class InitPrompt extends BasePrompt<InitPromptData> {
               label: pm.name,
             })),
           }),
-        orm: () =>
-          select({
-            message: "Which ORM do you want to use?",
-            options: [
-              { value: "none", label: "None" },
-              ...orms.map((orm) => ({
-                value: orm.id,
-                label: orm.name,
-              })),
-            ],
-          }),
+        ...selectionPrompts,
         installDependencies: () =>
           confirm({
             message: "Do you want to install dependencies?",
@@ -67,8 +60,19 @@ export class InitPrompt extends BasePrompt<InitPromptData> {
           process.exit(0);
         },
       }
-    );
+    )) as Record<string, string | string[] | boolean>;
 
-    return data;
+    return {
+      name: answers.name as string,
+      port: answers.port as string,
+      packageManager: answers.packageManager as PackageManager["id"],
+      installDependencies: answers.installDependencies as boolean,
+      selections: Object.fromEntries(
+        initSelectionGroups.map((selectionGroup) => [
+          selectionGroup.id,
+          answers[selectionGroup.id] as string | string[],
+        ])
+      ),
+    };
   }
 }

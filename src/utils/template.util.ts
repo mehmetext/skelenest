@@ -3,9 +3,10 @@ import fs from "fs-extra";
 import path from "path";
 
 export interface CopyTemplateTreeOptions {
-  templateRoot: string;
+  templateRoots: string[];
   outputRoot: string;
   data: Record<string, unknown>;
+  slots?: Record<string, string[]>;
 }
 
 async function listFilesRecursive(dir: string): Promise<string[]> {
@@ -29,29 +30,40 @@ async function listFilesRecursive(dir: string): Promise<string[]> {
 export async function copyTemplateTree(
   options: CopyTemplateTreeOptions
 ): Promise<void> {
-  const { templateRoot, outputRoot, data } = options;
-  const exists = await fs.pathExists(templateRoot);
-  if (!exists) {
-    throw new Error(`Template directory not found: ${templateRoot}`);
+  const { templateRoots, outputRoot, data, slots = {} } = options;
+
+  for (const templateRoot of templateRoots) {
+    const exists = await fs.pathExists(templateRoot);
+    if (!exists) {
+      throw new Error(`Template directory not found: ${templateRoot}`);
+    }
   }
 
   await fs.ensureDir(outputRoot);
-  const files = await listFilesRecursive(templateRoot);
 
-  for (const filePath of files) {
-    const relative = path.relative(templateRoot, filePath);
-    const destRelative = relative.endsWith(".ejs")
-      ? relative.slice(0, -".ejs".length)
-      : relative;
-    const destPath = path.join(outputRoot, destRelative);
-    await fs.ensureDir(path.dirname(destPath));
+  for (const templateRoot of templateRoots) {
+    const files = await listFilesRecursive(templateRoot);
 
-    if (relative.endsWith(".ejs")) {
-      const template = await fs.readFile(filePath, "utf8");
-      const rendered = ejs.render(template, data);
-      await fs.writeFile(destPath, rendered, "utf8");
-    } else {
-      await fs.copy(filePath, destPath);
+    for (const filePath of files) {
+      const relative = path.relative(templateRoot, filePath);
+      const destRelative = relative.endsWith(".ejs")
+        ? relative.slice(0, -".ejs".length)
+        : relative;
+      const destPath = path.join(outputRoot, destRelative);
+      await fs.ensureDir(path.dirname(destPath));
+
+      if (relative.endsWith(".ejs")) {
+        const template = await fs.readFile(filePath, "utf8");
+        const rendered = ejs.render(template, {
+          ...data,
+          getSlot(slotName: string): string[] {
+            return slots[slotName] ?? [];
+          },
+        });
+        await fs.writeFile(destPath, rendered, "utf8");
+      } else {
+        await fs.copy(filePath, destPath);
+      }
     }
   }
 }

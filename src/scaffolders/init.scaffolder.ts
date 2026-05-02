@@ -2,7 +2,7 @@ import { outro, spinner } from "@clack/prompts";
 import chalk from "chalk";
 import fs from "fs-extra";
 import path from "path";
-import { InitPromptData } from "../prompts";
+import { createInitBlueprint, InitPromptData } from "../init";
 import {
   assertTargetDirectoryEmpty,
   copyTemplateTree,
@@ -20,19 +20,16 @@ export class InitScaffolder extends BaseScaffolder {
     await assertTargetDirectoryEmpty(targetDir);
     await fs.ensureDir(targetDir);
 
-    const templateRoot = path.join(__dirname, "..", "src", "templates", "init");
+    const blueprint = createInitBlueprint(this.data);
 
     const sDirectory = spinner();
     sDirectory.start(`Creating ${this.data.name}...`);
     try {
       await copyTemplateTree({
-        templateRoot,
+        templateRoots: blueprint.templateRoots,
         outputRoot: targetDir,
-        data: {
-          name: this.data.name,
-          packageManager: this.data.packageManager,
-          port: this.data.port,
-        },
+        data: blueprint.templateData,
+        slots: blueprint.slots,
       });
     } catch (error) {
       sDirectory.stop("Failed to create project files.");

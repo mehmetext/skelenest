@@ -1,0 +1,10 @@
+import { TypeOrmModuleOptions } from "@nestjs/typeorm";
+import { ExampleEntity } from "./entities/example.entity";
+
+export const typeOrmConfig: TypeOrmModuleOptions = {
+  type: "postgres",
+  url: process.env.DATABASE_URL,
+  entities: [ExampleEntity],
+  autoLoadEntities: true,
+  synchronize: process.env.NODE_ENV !== "production",
+};

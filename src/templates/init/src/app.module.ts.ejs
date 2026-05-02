@@ -1,5 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+<% for (const statement of getSlot('app.module.imports')) { %>
+<%- statement %>
+<% } %>
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -8,6 +11,9 @@ import { AppService } from './app.service';
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+<% for (const moduleImport of getSlot('app.module.moduleImports')) { %>
+    <%- moduleImport %>,
+<% } %>
   ],
   controllers: [AppController],
   providers: [AppService],

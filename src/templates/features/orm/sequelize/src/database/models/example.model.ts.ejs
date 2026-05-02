@@ -1,0 +1,32 @@
+import {
+  Column,
+  CreatedAt,
+  DataType,
+  Model,
+  PrimaryKey,
+  Table,
+  UpdatedAt,
+} from "sequelize-typescript";
+
+@Table({ tableName: "examples" })
+export class ExampleModel extends Model<ExampleModel> {
+  @PrimaryKey
+  @Column({
+    autoIncrement: true,
+    type: DataType.INTEGER,
+  })
+  declare id: number;
+
+  @Column({
+    allowNull: false,
+    defaultValue: "example",
+    type: DataType.STRING,
+  })
+  declare name: string;
+
+  @CreatedAt
+  declare createdAt: Date;
+
+  @UpdatedAt
+  declare updatedAt: Date;
+}
