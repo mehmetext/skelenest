@@ -1,7 +1,10 @@
 import fs from "fs-extra";
 import path from "path";
-import { loadGenerateProjectContext } from "../generate/project-context";
-import { DoctorContext, DoctorFinding } from "./types";
+import {
+  detectProjectPackageManager,
+  loadGenerateProjectContext,
+} from "../generate/project-context";
+import { DoctorContext, DoctorFinding, DoctorSummary } from "./types";
 
 function parseEnvFile(content: string): Record<string, string> {
   const entries: Record<string, string> = {};
@@ -78,6 +81,7 @@ function expectedUsersModulePath(context: DoctorContext): string {
 async function buildDoctorContext(cwd: string): Promise<DoctorContext> {
   const projectContext = await loadGenerateProjectContext(cwd);
   const packageJson = (await fs.readJson(path.join(cwd, "package.json"))) as DoctorContext["packageJson"];
+  const packageManager = await detectProjectPackageManager(cwd);
   const envPath = path.join(cwd, ".env");
   const envContent = (await fs.pathExists(envPath))
     ? await fs.readFile(envPath, "utf8")
@@ -95,6 +99,7 @@ async function buildDoctorContext(cwd: string): Promise<DoctorContext> {
     orm: projectContext.orm,
     features,
     modules: new Set(projectContext.config.modules),
+    packageManager,
     packageJson,
     env: parseEnvFile(envContent),
     appModuleContent: await fs.readFile(path.join(cwd, "src", "app.module.ts"), "utf8"),
@@ -108,6 +113,15 @@ async function checkBaseProject(context: DoctorContext): Promise<DoctorFinding[]
     ".skelenest/project.json",
     "package.json",
     ".env",
+    ".gitignore",
+    ".prettierrc",
+    "nest-cli.json",
+    "tsconfig.json",
+    "tsconfig.build.json",
+    "eslint.config.mjs",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "SKILL.md",
     "README.md",
     "src/app.module.ts",
     "src/main.ts",
@@ -158,6 +172,31 @@ async function checkBaseProject(context: DoctorContext): Promise<DoctorFinding[]
     pushFinding(findings, "error", "PORT env missing", ".env should define PORT.");
   }
 
+  if (context.packageManager) {
+    pushFinding(
+      findings,
+      "ok",
+      "Package manager detected",
+      `Detected ${context.packageManager} from the project lockfile.`
+    );
+  }
+
+  if (context.packageJson.packageManager) {
+    pushFinding(
+      findings,
+      "ok",
+      "packageManager field found",
+      `package.json declares packageManager=${context.packageJson.packageManager}.`
+    );
+  } else {
+    pushFinding(
+      findings,
+      "warn",
+      "packageManager field missing",
+      "package.json does not declare the packageManager field."
+    );
+  }
+
   return findings;
 }
 
@@ -197,11 +236,37 @@ async function checkArchitecture(context: DoctorContext): Promise<DoctorFinding[
 async function checkOrm(context: DoctorContext): Promise<DoctorFinding[]> {
   const findings: DoctorFinding[] = [];
 
+  const ormDependencies = [
+    "@prisma/client",
+    "@prisma/adapter-pg",
+    "prisma",
+    "@nestjs/typeorm",
+    "typeorm",
+    "@nestjs/sequelize",
+    "sequelize",
+    "sequelize-typescript",
+  ];
+
   if (context.orm === "none") {
     if ("DATABASE_URL" in context.env) {
       pushFinding(findings, "warn", "Unexpected DATABASE_URL", "No ORM is selected, but .env still defines DATABASE_URL.");
     } else {
       pushFinding(findings, "ok", "No ORM env leakage", "DATABASE_URL is absent as expected for ORM=none.");
+    }
+
+    const leakedOrmDeps = ormDependencies.filter((dependency) =>
+      hasDependency(context, dependency)
+    );
+
+    if (leakedOrmDeps.length > 0) {
+      pushFinding(
+        findings,
+        "warn",
+        "Unexpected ORM dependencies",
+        `No ORM is selected, but these ORM packages are installed: ${leakedOrmDeps.join(", ")}.`
+      );
+    } else {
+      pushFinding(findings, "ok", "No ORM dependency leakage", "No ORM-specific dependencies were detected.");
     }
 
     return findings;
@@ -340,6 +405,25 @@ async function checkFeatures(context: DoctorContext): Promise<DoctorFinding[]> {
       pushFinding(findings, "error", "Redis wiring missing", "AppModule should configure RedisModule.forRootAsync.");
     }
   }
+  else {
+    const redisLeakSignals = [
+      "REDIS_URL" in context.env,
+      hasDependency(context, "@nestjs-modules/ioredis"),
+      hasDependency(context, "ioredis"),
+      context.appModuleContent.includes("RedisModule.forRootAsync"),
+    ];
+
+    if (redisLeakSignals.some(Boolean)) {
+      pushFinding(
+        findings,
+        "warn",
+        "Unexpected Redis wiring",
+        "Redis is not selected, but Redis env/config/dependencies were still detected."
+      );
+    } else {
+      pushFinding(findings, "ok", "No Redis leakage", "Redis-only wiring is absent as expected.");
+    }
+  }
 
   if (context.features.has("bullmq")) {
     for (const dep of ["@nestjs/bullmq", "bullmq"]) {
@@ -354,6 +438,24 @@ async function checkFeatures(context: DoctorContext): Promise<DoctorFinding[]> {
       pushFinding(findings, "ok", "BullMQ wiring found", "AppModule configures BullModule.forRootAsync.");
     } else {
       pushFinding(findings, "error", "BullMQ wiring missing", "AppModule should configure BullModule.forRootAsync.");
+    }
+  }
+  else {
+    const bullLeakSignals = [
+      hasDependency(context, "@nestjs/bullmq"),
+      hasDependency(context, "bullmq"),
+      context.appModuleContent.includes("BullModule.forRootAsync"),
+    ];
+
+    if (bullLeakSignals.some(Boolean)) {
+      pushFinding(
+        findings,
+        "warn",
+        "Unexpected BullMQ wiring",
+        "BullMQ is not selected, but queue-specific dependencies or wiring were detected."
+      );
+    } else {
+      pushFinding(findings, "ok", "No BullMQ leakage", "BullMQ-only wiring is absent as expected.");
     }
   }
 
@@ -378,6 +480,24 @@ async function checkFeatures(context: DoctorContext): Promise<DoctorFinding[]> {
       pushFinding(findings, "error", "Throttler wiring missing", "AppModule should configure ThrottlerModule.forRootAsync.");
     }
   }
+  else {
+    const throttlerLeakSignals = [
+      hasDependency(context, "@nestjs/throttler"),
+      hasDependency(context, "@nest-lab/throttler-storage-redis"),
+      context.appModuleContent.includes("ThrottlerModule.forRootAsync"),
+    ];
+
+    if (throttlerLeakSignals.some(Boolean)) {
+      pushFinding(
+        findings,
+        "warn",
+        "Unexpected throttler wiring",
+        "Throttler is not selected, but throttler dependencies or AppModule wiring were detected."
+      );
+    } else {
+      pushFinding(findings, "ok", "No throttler leakage", "Throttler-only wiring is absent as expected.");
+    }
+  }
 
   if (context.features.has("swagger")) {
     if (hasDependency(context, "@nestjs/swagger")) {
@@ -395,6 +515,24 @@ async function checkFeatures(context: DoctorContext): Promise<DoctorFinding[]> {
       pushFinding(findings, "error", "Swagger bootstrap missing", "main.ts should configure SwaggerModule when Swagger is selected.");
     }
   }
+  else {
+    const swaggerLeakSignals = [
+      hasDependency(context, "@nestjs/swagger"),
+      context.mainContent.includes("SwaggerModule.setup"),
+      context.mainContent.includes("DocumentBuilder"),
+    ];
+
+    if (swaggerLeakSignals.some(Boolean)) {
+      pushFinding(
+        findings,
+        "warn",
+        "Unexpected Swagger wiring",
+        "Swagger is not selected, but Swagger dependencies or bootstrap code were detected."
+      );
+    } else {
+      pushFinding(findings, "ok", "No Swagger leakage", "Swagger-only wiring is absent as expected.");
+    }
+  }
 
   if (context.features.has("docker")) {
     for (const file of ["Dockerfile", "docker-compose.yml"]) {
@@ -403,6 +541,23 @@ async function checkFeatures(context: DoctorContext): Promise<DoctorFinding[]> {
       } else {
         pushFinding(findings, "warn", "Docker artifact missing", `${file} is usually expected when Docker is selected.`);
       }
+    }
+  }
+  else {
+    const dockerLeakSignals = [
+      await pathExists(context.cwd, "Dockerfile"),
+      await pathExists(context.cwd, "docker-compose.yml"),
+    ];
+
+    if (dockerLeakSignals.some(Boolean)) {
+      pushFinding(
+        findings,
+        "warn",
+        "Unexpected Docker artifacts",
+        "Docker is not selected, but Dockerfile or docker-compose.yml was detected."
+      );
+    } else {
+      pushFinding(findings, "ok", "No Docker leakage", "Docker-only artifacts are absent as expected.");
     }
   }
 
@@ -516,11 +671,47 @@ async function checkLockfile(context: DoctorContext): Promise<DoctorFinding[]> {
     pushFinding(findings, "ok", "Lockfile found", `Detected ${present.join(", ")}.`);
   }
 
+  if (present.length > 1) {
+    pushFinding(
+      findings,
+      "warn",
+      "Multiple lockfiles found",
+      `More than one lockfile is present: ${present.join(", ")}. This can confuse installs.`
+    );
+  }
+
+  if (context.packageManager && context.packageJson.packageManager) {
+    if (context.packageJson.packageManager.startsWith(context.packageManager)) {
+      pushFinding(
+        findings,
+        "ok",
+        "Package manager metadata matches",
+        "Lockfile detection matches package.json packageManager."
+      );
+    } else {
+      pushFinding(
+        findings,
+        "warn",
+        "Package manager mismatch",
+        `Lockfile suggests ${context.packageManager}, but package.json declares ${context.packageJson.packageManager}.`
+      );
+    }
+  }
+
   return findings;
+}
+
+function summarizeFindings(findings: DoctorFinding[]): DoctorSummary {
+  return {
+    ok: findings.filter((finding) => finding.severity === "ok").length,
+    warn: findings.filter((finding) => finding.severity === "warn").length,
+    error: findings.filter((finding) => finding.severity === "error").length,
+  };
 }
 
 export async function runDoctor(cwd: string): Promise<{
   findings: DoctorFinding[];
+  summary: DoctorSummary;
   hasErrors: boolean;
 }> {
   const findings: DoctorFinding[] = [];
@@ -554,6 +745,7 @@ export async function runDoctor(cwd: string): Promise<{
 
   return {
     findings,
+    summary: summarizeFindings(findings),
     hasErrors: findings.some((finding) => finding.severity === "error"),
   };
 }

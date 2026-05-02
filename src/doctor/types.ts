@@ -6,13 +6,21 @@ export interface DoctorFinding {
   detail: string;
 }
 
+export interface DoctorSummary {
+  ok: number;
+  warn: number;
+  error: number;
+}
+
 export interface DoctorContext {
   cwd: string;
   architecture: "standard" | "clean" | "ddd";
   orm: "prisma" | "typeorm" | "sequelize" | "none";
   features: Set<string>;
   modules: Set<string>;
+  packageManager: "npm" | "pnpm" | "yarn" | null;
   packageJson: {
+    packageManager?: string;
     scripts?: Record<string, string>;
     dependencies?: Record<string, string>;
     devDependencies?: Record<string, string>;

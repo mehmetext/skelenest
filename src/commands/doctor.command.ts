@@ -20,10 +20,37 @@ export class DoctorCommand extends BaseCommand {
       name: "doctor",
       description: "Inspect a generated Skelenest project and report configuration issues",
     });
+
+    this.option("--json", "Print doctor findings as JSON");
+    this.option(
+      "--fail-on-warn",
+      "Return a failing exit code when warnings are present"
+    );
   }
 
   async execute(): Promise<void> {
-    const { findings, hasErrors } = await runDoctor(process.cwd());
+    const options = this.opts<{ json?: boolean; failOnWarn?: boolean }>();
+    const { findings, summary, hasErrors } = await runDoctor(process.cwd());
+
+    if (options.json) {
+      console.log(
+        JSON.stringify(
+          {
+            findings,
+            summary,
+            hasErrors,
+          },
+          null,
+          2
+        )
+      );
+
+      if (hasErrors || (options.failOnWarn && summary.warn > 0)) {
+        process.exitCode = 1;
+      }
+      return;
+    }
+
     const ordered = [
       ...findings.filter((finding) => finding.severity === "error"),
       ...findings.filter((finding) => finding.severity === "warn"),
@@ -35,21 +62,17 @@ export class DoctorCommand extends BaseCommand {
       console.log(`  ${finding.detail}`);
     }
 
-    const okCount = findings.filter((finding) => finding.severity === "ok").length;
-    const warnCount = findings.filter((finding) => finding.severity === "warn").length;
-    const errorCount = findings.filter((finding) => finding.severity === "error").length;
-
     console.log("");
     console.log(
       [
         chalk.cyan("Doctor summary"),
-        `ok=${okCount}`,
-        `warn=${warnCount}`,
-        `error=${errorCount}`,
+        `ok=${summary.ok}`,
+        `warn=${summary.warn}`,
+        `error=${summary.error}`,
       ].join(" | ")
     );
 
-    if (hasErrors) {
+    if (hasErrors || (options.failOnWarn && summary.warn > 0)) {
       process.exitCode = 1;
     }
   }
