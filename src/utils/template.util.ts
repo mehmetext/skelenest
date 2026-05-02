@@ -9,6 +9,36 @@ export interface CopyTemplateTreeOptions {
   slots?: Record<string, string[]>;
 }
 
+function normalizeRenderedTemplate(rendered: string): string {
+  const normalizedNewlines = rendered.replace(/\r\n/g, "\n");
+  const trimmedLineEnds = normalizedNewlines.replace(/[ \t]+$/gm, "");
+  const normalizedBlankLines = trimmedLineEnds.replace(
+    /\n(?:[ \t]*\n){2,}/g,
+    "\n\n"
+  );
+
+  return normalizedBlankLines.endsWith("\n")
+    ? normalizedBlankLines
+    : `${normalizedBlankLines}\n`;
+}
+
+function normalizeRenderedTemplateByTarget(
+  destPath: string,
+  rendered: string
+): string {
+  const normalized = normalizeRenderedTemplate(rendered);
+  const extension = path.extname(destPath);
+
+  if (extension === ".yml" || extension === ".yaml") {
+    const withoutYamlBlankLines = normalized.replace(/\n(?:[ \t]*\n)+/g, "\n");
+    return withoutYamlBlankLines.endsWith("\n")
+      ? withoutYamlBlankLines
+      : `${withoutYamlBlankLines}\n`;
+  }
+
+  return normalized;
+}
+
 async function listFilesRecursive(dir: string): Promise<string[]> {
   const entries = await fs.readdir(dir, { withFileTypes: true });
   const files: string[] = [];
@@ -60,7 +90,11 @@ export async function copyTemplateTree(
             return slots[slotName] ?? [];
           },
         });
-        await fs.writeFile(destPath, rendered, "utf8");
+        await fs.writeFile(
+          destPath,
+          normalizeRenderedTemplateByTarget(destPath, rendered),
+          "utf8"
+        );
       } else {
         await fs.copy(filePath, destPath);
       }
