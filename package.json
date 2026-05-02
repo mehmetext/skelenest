@@ -1,18 +1,37 @@
 {
   "name": "skelenest",
   "version": "1.0.0",
-  "description": "",
+  "description": "An opinionated CLI for scaffolding NestJS projects",
   "scripts": {
     "dev": "rm -rf dist && tsx watch bin/skelenest.ts",
     "build": "rm -rf dist && tsup bin/skelenest.ts src/**/*.ts --format cjs --dts && chmod +x dist/bin/skelenest.js && cpx \"src/templates/**/*\" dist/src/templates && cpx \"src/templates/**/.[!.]*\" dist/src/templates",
     "start": "node ./dist/bin/skelenest.js",
-    "dev:init": "pnpm build && skelenest init"
+    "dev:init": "pnpm build && skelenest init",
+    "prepublishOnly": "pnpm build"
   },
   "bin": {
-    "skelenest": "./dist/bin/skelenest.js"
+    "skelenest": "dist/bin/skelenest.js"
   },
-  "keywords": [],
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "keywords": [
+    "nest",
+    "nestjs",
+    "cli",
+    "scaffold",
+    "boilerplate"
+  ],
   "author": "",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mehmetext/skelenest.git"
+  },
+  "homepage": "https://github.com/mehmetext/skelenest#readme",
+  "bugs": {
+    "url": "https://github.com/mehmetext/skelenest/issues"
+  },
   "license": "ISC",
   "packageManager": "pnpm@10.28.0",
   "dependencies": {
