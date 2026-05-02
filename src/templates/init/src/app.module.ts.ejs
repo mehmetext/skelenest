@@ -1,13 +1,21 @@
 <%_ const includesRedis = selectedOptionIds.includes('redis'); _%>
 <%_ const includesBullmq = selectedOptionIds.includes('bullmq'); _%>
+<%_ const includesThrottler = selectedOptionIds.includes('throttler'); _%>
 <%_ if (includesRedis) { _%>
 import { RedisModule } from '@nestjs-modules/ioredis';
+<%_ } _%>
+<%_ if (includesRedis && includesThrottler) { _%>
+import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
 <%_ } _%>
 <%_ if (includesBullmq) { _%>
 import { BullModule } from '@nestjs/bullmq';
 <%_ } _%>
 import { Module } from '@nestjs/common';
-import { ConfigModule<%_ if (includesRedis || includesBullmq) { _%>, ConfigService<%_ } _%> } from '@nestjs/config';
+import { ConfigModule<%_ if (includesRedis || includesBullmq || includesThrottler) { _%>, ConfigService<%_ } _%> } from '@nestjs/config';
+<%_ if (includesThrottler) { _%>
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+<%_ } _%>
 <%
 const appModuleImports = getSlot('app.module.imports');
 const appModuleEntries = getSlot('app.module.moduleImports');
@@ -46,11 +54,51 @@ import { AppService } from './app.service';
       inject: [ConfigService],
     }),
 <%_ } _%>
+<%_ if (includesThrottler) { _%>
+    ThrottlerModule.forRootAsync({
+      useFactory: (configService: ConfigService) => ({
+        throttlers: [
+          {
+            name: 'short',
+            ttl: 1000,
+            limit: 3,
+          },
+          {
+            name: 'medium',
+            ttl: 10000,
+            limit: 20,
+          },
+          {
+            name: 'long',
+            ttl: 60000,
+            limit: 100,
+          },
+        ],
+<%_ if (includesRedis) { _%>
+        storage: new ThrottlerStorageRedisService(
+          configService.getOrThrow('REDIS_URL'),
+          {
+            keyPrefix: '<%= name %>:',
+          },
+        ),
+<%_ } _%>
+      }),
+      inject: [ConfigService],
+    }),
+<%_ } _%>
 <%_ if (appModuleEntries.length > 0) { _%>
 <%- appModuleEntries.map((moduleImport) => `    ${moduleImport},`).join('\n') %>
 <%_ } _%>
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+<%_ if (includesThrottler) { _%>
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+<%_ } _%>
+  ],
 })
 export class AppModule {}

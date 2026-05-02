@@ -64,18 +64,15 @@ export const featureOptions: TechnologyOption<InitPromptData>[] = [
     id: "throttler",
     label: "Throttler",
     description: "Configures global request throttling",
-    contribute: () => ({
-      slots: {
-        "app.module.imports": [
-          "import { ThrottlerModule } from '@nestjs/throttler';",
-        ],
-        "app.module.moduleImports": [
-          "ThrottlerModule.forRoot([{ ttl: 60_000, limit: 20 }])",
-        ],
-      },
+    contribute: (context) => ({
       packageJson: {
         dependencies: {
-          "@nestjs/throttler": "^6.4.0",
+          ...(context.has("redis")
+            ? {
+                "@nest-lab/throttler-storage-redis": "^1.2.0",
+              }
+            : {}),
+          "@nestjs/throttler": "^6.5.0",
         },
       },
     }),
