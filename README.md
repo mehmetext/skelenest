@@ -1,43 +1,57 @@
 # skelenest
 
-`skelenest` is a CLI for scaffolding NestJS projects with a guided interactive flow.
+`skelenest` is an opinionated CLI for scaffolding and growing NestJS projects.
 
-Instead of starting from a blank Nest app and wiring everything by hand, `skelenest` asks a few questions, generates the project structure, adds the dependencies you selected, and prepares a working starting point.
+It covers the first project bootstrap, architecture-aware code generation inside an existing project, and a `doctor` pass for checking whether a generated app still matches the selected stack.
 
 ## What it does
 
 - Creates a new NestJS project in a new directory
-- Lets you choose your package manager: `npm`, `pnpm`, or `yarn`
+- Lets you choose a package manager: `npm`, `pnpm`, or `yarn`
 - Lets you choose an ORM: `Prisma`, `TypeORM`, `Sequelize`, or none
 - Lets you enable optional features such as `Docker`, `Redis`, `BullMQ`, `Swagger`, `Throttler`, and an auth starter
-- Merges dependencies and scripts based on your selections
+- Generates modules, CRUD resources, DTOs, and use cases inside an existing Skelenest project
+- Verifies generated projects with `doctor`, including stack wiring, required files, scripts, and selected feature checks
 - Sets up request validation defaults with Nest's global `ValidationPipe`
-- Can install dependencies for you after generation
 
 ## Install
 
-Use it directly with `npx`:
+Run it directly:
 
 ```bash
 npx skelenest init
 ```
 
-Or with `pnpm`:
+With `pnpm`:
 
 ```bash
 pnpm dlx skelenest init
 ```
 
-Or install it globally:
+Or install globally:
 
 ```bash
 npm install -g skelenest
-skelenest init
+skelenest --help
 ```
+
+## Commands
+
+```bash
+skelenest init
+skelenest generate module <name>
+skelenest generate resource <name>
+skelenest generate dto <module> <name>
+skelenest generate use-case <module> <name>
+skelenest doctor
+skelenest doctor --json
+```
+
+`generate` also has the short alias `skelenest g`.
 
 ## Quick start
 
-Run the generator:
+Create a project:
 
 ```bash
 npx skelenest init
@@ -49,33 +63,24 @@ You will be prompted for:
 - HTTP port
 - Package manager
 - ORM preference
+- Architecture style
 - Optional features
+- Starter modules
 - Whether dependencies should be installed automatically
+- Whether git should be initialized with a first commit
 
-After generation:
+Then move into the generated project and start it with the selected package manager:
 
 ```bash
 cd <project-name>
 pnpm run start:dev
 ```
 
-The generated project includes its own scripts, so after that point you work inside the new NestJS app as usual.
+Generated apps include `class-validator`, `class-transformer`, and a global `ValidationPipe` configured with `whitelist`, `forbidNonWhitelisted`, `transform`, implicit conversion, and `stopAtFirstError`.
 
-By default, generated apps also include `class-validator` and `class-transformer`, and configure a global `ValidationPipe` with `whitelist`, `forbidNonWhitelisted`, `transform`, implicit conversion, and `stopAtFirstError`.
+If Swagger is selected, docs are mounted at `GET /api/docs`.
 
-## Command
-
-```bash
-skelenest init
-```
-
-Help output:
-
-```bash
-skelenest --help
-```
-
-## Included options
+## Stack options
 
 ### ORMs
 
@@ -91,30 +96,33 @@ skelenest --help
 - `BullMQ`
 - `Throttler`
 - `Swagger`
-- `Auth Starter Skeleton`
+- `Auth Starter Module`
 
-Some options are dependency-aware. For example, features that require Redis can automatically pull Redis-related setup into the generated project.
+Some options are dependency-aware. For example, selecting `BullMQ` automatically pulls in the Redis stack.
 
-## How generation works
+## Generation model
 
-`skelenest` generates a new project folder in your current working directory.
+`skelenest init` creates a new project folder in your current working directory.
 
-Important behavior:
-
-- The target directory must not already contain files
+- The target directory must be empty
 - The generated app is created under the project name you provide
 - Dependency installation is optional
-- Template files are rendered from EJS templates and combined with your selected stack
+- Template files are rendered from EJS templates and merged with your selected stack
+- Generated projects include `.skelenest/project.json` metadata so later `generate` and `doctor` commands understand the original stack
 
-## Example flow
+## `doctor`
+
+Run `doctor` inside a generated project to validate the app against its selected architecture, ORM, modules, and feature set.
+
+Examples:
 
 ```bash
-mkdir my-workspace
-cd my-workspace
-npx skelenest init
-cd my-api
-pnpm run start:dev
+skelenest doctor
+skelenest doctor --json
+skelenest doctor --json --fail-on-warn
 ```
+
+The JSON mode prints machine-readable output without the ASCII banner, so it can be piped into tools in CI or local scripts.
 
 ## Local development
 
@@ -130,6 +138,13 @@ Build the distributable CLI:
 ```bash
 pnpm build
 pnpm start --help
+```
+
+Verification scripts:
+
+```bash
+pnpm verify:init-combinations
+pnpm verify:workflows
 ```
 
 The build output is written to `dist/`. Template assets under `src/templates/` are copied into the final package so the published CLI can render projects correctly.
@@ -155,43 +170,16 @@ These scripts:
 
 Use `pnpm release:dry` first if you want to preview the npm package contents without publishing.
 
-Make sure you are logged into npm and ready to publish before running the real release commands.
-
-Quick workflow after a change:
-
-```bash
-git add .
-git commit -m "feat: add x"
-git push origin main
-pnpm release:minor
-```
-
-Use `release:patch` for fixes and small updates, `release:minor` for new features, and `release:major` for breaking changes.
-
-These release commands also create a git tag via `npm version` and push it to GitHub with `--follow-tags`.
-
 ## Project structure
 
 - `bin/skelenest.ts`: CLI entrypoint
-- `src/commands/`: command definitions
+- `src/commands/`: `init`, `generate`, and `doctor` command definitions
 - `src/prompts/`: interactive prompt flow
 - `src/init/`: blueprint assembly and selection logic
+- `src/generate/`: project-aware code generation helpers
+- `src/doctor/`: generated-project validation
 - `src/templates/`: project templates and feature templates
-- `src/utils/`: shared helpers for rendering, filesystem work, and command execution
-
-## Publish notes
-
-The published npm package exposes a single binary:
-
-```bash
-skelenest
-```
-
-Current primary command:
-
-```bash
-skelenest init
-```
+- `src/utils/`: shared helpers for rendering, filesystem work, git, and CLI output
 
 ## License
 

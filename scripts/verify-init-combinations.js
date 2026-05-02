@@ -196,6 +196,11 @@ function verifyFeatureDependencies(blueprint, selectionCase) {
   const envEntries = blueprint.slots["env.entries"] || [];
   const packageJson = JSON.parse(blueprint.templateData.packageJson);
 
+  ensure(
+    packageJson.packageManager === "pnpm@10.28.0",
+    `Expected generated packageManager metadata to be pnpm@10.28.0, received ${packageJson.packageManager}`
+  );
+
   if (selectionCase.features.includes("bullmq")) {
     ensure(
       selectedOptionIds.includes("redis"),

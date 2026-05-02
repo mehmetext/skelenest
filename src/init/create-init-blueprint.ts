@@ -137,7 +137,10 @@ export function createInitBlueprint(
   return composeScaffoldingBlueprint({
     baseContributions: [baseContribution],
     selectedContributions,
-    basePackageJson: createBasePackageJson(data.name),
+    basePackageJson: {
+      ...createBasePackageJson(data.name),
+      packageManager: selectedPackageManager.packageManagerField,
+    },
     finalizeTemplateData: ({
       templateData,
       packageJson,

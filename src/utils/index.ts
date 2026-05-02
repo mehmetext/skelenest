@@ -6,3 +6,4 @@ export * from "./package-manager-format.util";
 export * from "./package-manager-install.util";
 export * from "./package-manager-run.util";
 export * from "./template.util";
+export * from "./version.util";

@@ -8,6 +8,7 @@
     "start": "node ./dist/bin/skelenest.js",
     "dev:init": "pnpm build && skelenest init",
     "verify:init-combinations": "pnpm build && node scripts/verify-init-combinations.js",
+    "verify:workflows": "pnpm build && node scripts/verify-workflows.js",
     "materialize:init-combinations": "pnpm build && node scripts/verify-init-combinations.js --output-dir .artifacts/init-combinations",
     "prepublishOnly": "pnpm build",
     "release:check": "node ./scripts/release-check.mjs",

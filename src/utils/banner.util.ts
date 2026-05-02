@@ -10,3 +10,7 @@ export function printBanner(): void {
   });
   process.stdout.write(`${chalk.cyanBright(rendered)}\n`);
 }
+
+export function shouldPrintBanner(argv: string[]): boolean {
+  return !(argv.includes("doctor") && argv.includes("--json"));
+}
