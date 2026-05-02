@@ -134,6 +134,29 @@ pnpm start --help
 
 The build output is written to `dist/`. Template assets under `src/templates/` are copied into the final package so the published CLI can render projects correctly.
 
+## Release
+
+For a one-command release from `main`, use one of:
+
+```bash
+pnpm release:dry
+pnpm release:patch
+pnpm release:minor
+pnpm release:major
+```
+
+These scripts:
+
+- verify that you are on `main`
+- verify that your git working tree is clean
+- bump the npm version
+- push the version commit and git tag to `origin/main`
+- publish the package to npm
+
+Use `pnpm release:dry` first if you want to preview the npm package contents without publishing.
+
+Make sure you are logged into npm and ready to publish before running the real release commands.
+
 ## Project structure
 
 - `bin/skelenest.ts`: CLI entrypoint
