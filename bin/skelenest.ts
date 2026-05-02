@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { Command } from "commander";
-import { GenerateCommand, InitCommand } from "../src/commands";
+import { DoctorCommand, GenerateCommand, InitCommand } from "../src/commands";
 import { printBanner } from "../src/utils";
 
 const program = new Command();
@@ -14,6 +14,7 @@ program
 
 program.addCommand(new InitCommand());
 program.addCommand(new GenerateCommand());
+program.addCommand(new DoctorCommand());
 
 program.action(() => {
   program.help();
