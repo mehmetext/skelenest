@@ -39,3 +39,9 @@ export interface GeneratedFile {
   path: string;
   content: string;
 }
+
+export interface ArtifactNames {
+  raw: string;
+  kebab: string;
+  pascal: string;
+}

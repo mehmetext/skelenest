@@ -1,4 +1,4 @@
-import { ResourceNames } from "./types";
+import { ArtifactNames, ResourceNames } from "./types";
 
 function toKebabCase(value: string): string {
   return value
@@ -63,5 +63,23 @@ export function createResourceNames(input: string): ResourceNames {
     repositoryInterfaceName: `${pluralPascal}Repository`,
     createDtoClassName: `Create${singularPascal}Dto`,
     updateDtoClassName: `Update${singularPascal}Dto`,
+  };
+}
+
+export function createArtifactNames(input: string): ArtifactNames {
+  const normalized = input
+    .trim()
+    .replace(/\.dto$/i, "")
+    .replace(/\.use-case$/i, "");
+  const kebab = toKebabCase(normalized);
+
+  if (kebab.length === 0) {
+    throw new Error("A name is required.");
+  }
+
+  return {
+    raw: input,
+    kebab,
+    pascal: toPascalCase(kebab),
   };
 }
