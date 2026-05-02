@@ -777,12 +777,59 @@ function toEntity(record: ${names.singularPascal}): ${names.singularPascal}Entit
       : "";
   const resultType =
     context.architecture === "ddd" ? `${names.singularPascal}Entity` : names.singularPascal;
-  const allMapper = context.architecture === "ddd" ? ".then((records) => records.map(toEntity))" : "";
-  const oneMapper =
+  const findAllBody =
     context.architecture === "ddd"
-      ? ".then((record) => (record ? toEntity(record) : null))"
-      : "";
-  const saveMapper = context.architecture === "ddd" ? ".then(toEntity)" : "";
+      ? `const records = await this.prisma.${modelAccessor}.findMany();
+    return records.map(toEntity);`
+      : `return this.prisma.${modelAccessor}.findMany();`;
+  const findOneBody =
+    context.architecture === "ddd"
+      ? `const record = await this.prisma.${modelAccessor}.findUnique({
+      where: { id },
+    });
+
+    return record ? toEntity(record) : null;`
+      : `return this.prisma.${modelAccessor}.findUnique({
+      where: { id },
+    });`;
+  const createBody =
+    context.architecture === "ddd"
+      ? `const record = await this.prisma.${modelAccessor}.create({
+      data: {
+        name: dto.name,
+        description: dto.description ?? null,
+        isActive: dto.isActive ?? true,
+      },
+    });
+
+    return toEntity(record);`
+      : `return this.prisma.${modelAccessor}.create({
+      data: {
+        name: dto.name,
+        description: dto.description ?? null,
+        isActive: dto.isActive ?? true,
+      },
+    });`;
+  const updateBody =
+    context.architecture === "ddd"
+      ? `const record = await this.prisma.${modelAccessor}.update({
+      where: { id },
+      data: {
+        ...(dto.name !== undefined ? { name: dto.name } : {}),
+        ...(dto.description !== undefined ? { description: dto.description } : {}),
+        ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
+      },
+    });
+
+    return toEntity(record);`
+      : `return this.prisma.${modelAccessor}.update({
+      where: { id },
+      data: {
+        ...(dto.name !== undefined ? { name: dto.name } : {}),
+        ...(dto.description !== undefined ? { description: dto.description } : {}),
+        ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
+      },
+    });`;
 
   return `import type { ${names.singularPascal} } from 'src/generated/prisma/client';
 import { Injectable } from '@nestjs/common';
@@ -794,35 +841,20 @@ ${dddImport}${mapper}@Injectable()
 export class Prisma${names.pluralPascal}Repository implements ${names.repositoryInterfaceName} {
   constructor(private readonly prisma: PrismaService) {}
 
-  findAll(): Promise<${resultType}[]> {
-    return this.prisma.${modelAccessor}.findMany()${allMapper};
+  async findAll(): Promise<${resultType}[]> {
+    ${findAllBody}
   }
 
-  findOne(id: string): Promise<${resultType} | null> {
-    return this.prisma.${modelAccessor}.findUnique({
-      where: { id },
-    })${oneMapper};
+  async findOne(id: string): Promise<${resultType} | null> {
+    ${findOneBody}
   }
 
-  create(dto: ${names.createDtoClassName}): Promise<${resultType}> {
-    return this.prisma.${modelAccessor}.create({
-      data: {
-        name: dto.name,
-        description: dto.description ?? null,
-        isActive: dto.isActive ?? true,
-      },
-    })${saveMapper};
+  async create(dto: ${names.createDtoClassName}): Promise<${resultType}> {
+    ${createBody}
   }
 
-  update(id: string, dto: ${names.updateDtoClassName}): Promise<${resultType}> {
-    return this.prisma.${modelAccessor}.update({
-      where: { id },
-      data: {
-        ...(dto.name !== undefined ? { name: dto.name } : {}),
-        ...(dto.description !== undefined ? { description: dto.description } : {}),
-        ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
-      },
-    })${saveMapper};
+  async update(id: string, dto: ${names.updateDtoClassName}): Promise<${resultType}> {
+    ${updateBody}
   }
 
   async remove(id: string): Promise<{ deleted: true; id: string }> {
