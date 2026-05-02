@@ -1,0 +1,115 @@
+---
+name: skelenest-project
+description: Work on this generated NestJS project. Use when changing application code, modules, authentication, persistence, runtime features, tests, or project conventions in this repository.
+---
+
+# Skelenest Project Skill
+
+Use this skill when working inside this generated NestJS project. Keep changes aligned with the selected stack below and do not introduce technologies that were not selected unless the user explicitly asks for them.
+
+## Selected Stack
+
+- Project: `<%= name %>`
+- Architecture: `<%= selectionSummary.architecture %>`
+- ORM: `<%= selectionSummary.orm ?? 'None' %>`
+- Features: <%= selectionSummary.features.length > 0 ? selectionSummary.features.join(', ') : 'None' %>
+- Starter modules: <%= selectionSummary.modules.length > 0 ? selectionSummary.modules.join(', ') : 'None' %>
+- Package manager: `<%= pmRunCommandPrefix %>`
+
+## Working Rules
+
+1. Preserve the selected architecture style.
+2. Keep generated code complete, but avoid unused abstractions, dependencies, modules, imports, providers, environment variables, and Docker services.
+3. Prefer focused, incremental edits over broad rewrites.
+4. After code changes, run the smallest relevant verification first, then broader checks when the change crosses module boundaries.
+5. Do not add a new ORM, cache, queue, auth strategy, or documentation system unless the user asks for that technology.
+
+## Architecture Guidance
+
+<%_ if (selections.architecture === 'standard') { _%>
+This project uses the standard NestJS module style. Place feature code close together under `src/<feature>`, keep controllers thin, keep business logic in services, and wire providers in each feature module.
+<%_ } else if (selections.architecture === 'clean') { _%>
+This project uses Clean Architecture. Keep presentation concerns under `presentation`, application behavior under `application`, infrastructure adapters under `infrastructure`, and depend on ports rather than concrete adapters across boundaries.
+<%_ } else if (selections.architecture === 'ddd') { _%>
+This project uses DDD plus Clean Architecture. Keep domain rules in `domain`, use cases and ports in `application`, adapters in `infrastructure`, and HTTP concerns in `presentation`. Avoid leaking framework or persistence details into domain code.
+<%_ } _%>
+
+## Persistence Rules
+
+<%_ if (selections.orm === 'prisma') { _%>
+- Prisma is the selected ORM. Use `PrismaService` and the generated Prisma client types.
+- Keep Prisma schema changes in `prisma/schema.prisma`.
+- Use `prisma:generate` after schema changes and a migration command when persistence shape changes.
+- Do not add TypeORM or Sequelize code.
+<%_ } else if (selections.orm === 'typeorm') { _%>
+- TypeORM is the selected ORM. Use `TypeOrmModule` and entities under `src/database/entities`.
+- Do not add Prisma or Sequelize code.
+<%_ } else if (selections.orm === 'sequelize') { _%>
+- Sequelize is the selected ORM. Use `SequelizeModule` and models under `src/database/models`.
+- Do not add Prisma or TypeORM code.
+<%_ } else { _%>
+- No ORM was selected. Do not add database clients, migrations, repositories, or `DATABASE_URL` unless the user asks to introduce persistence.
+<%_ } _%>
+
+## Feature Rules
+
+<%_ if (selectedOptionIds.includes('redis')) { _%>
+- Redis is selected. Use the existing Redis module wiring and `REDIS_URL` configuration.
+<%_ } else { _%>
+- Redis is not selected. Do not add Redis dependencies, `REDIS_URL`, Redis modules, Redis auth sessions, or Redis-backed throttling.
+<%_ } _%>
+<%_ if (selectedOptionIds.includes('bullmq')) { _%>
+- BullMQ is selected. Queue code may use BullMQ and the Redis connection already configured by this scaffold.
+<%_ } else { _%>
+- BullMQ is not selected. Do not add queue processors, BullMQ dependencies, or queue-specific runtime config.
+<%_ } _%>
+<%_ if (selectedOptionIds.includes('throttler')) { _%>
+- Throttler is selected. Keep rate limiting centralized in `AppModule` unless a feature-specific override is explicitly needed.
+<%_ } else { _%>
+- Throttler is not selected. Do not add rate limiting modules or guards unless requested.
+<%_ } _%>
+<%_ if (selectedOptionIds.includes('swagger')) { _%>
+- Swagger is selected. Keep DTO and controller decorators consistent with existing OpenAPI usage.
+<%_ } else { _%>
+- Swagger is not selected. Do not add `@nestjs/swagger` imports or decorators.
+<%_ } _%>
+<%_ if (selectedOptionIds.includes('docker')) { _%>
+- Docker is selected. Keep runtime service changes reflected in `Dockerfile` and `docker-compose.yml`.
+<%_ } else { _%>
+- Docker is not selected. Do not add Docker files or Docker-only environment assumptions unless requested.
+<%_ } _%>
+
+## Auth Rules
+
+<%_ if (Array.isArray(selections.modules) && selections.modules.includes('auth')) { _%>
+- Auth starter module is selected and is Prisma-backed.
+<%_ if (selectedOptionIds.includes('redis')) { _%>
+- Auth sessions and access-token blocklisting use Redis. Do not add Prisma refresh-session or revoked-token models.
+<%_ } else { _%>
+- Auth sessions and access-token blocklisting use Prisma models. Do not add Redis auth session code.
+<%_ } _%>
+- Keep password hashing, token creation, guards, strategies, and DTOs in the generated auth module structure for the selected architecture.
+<%_ } else { _%>
+- Auth starter module is not selected. Do not add auth guards, JWT modules, passport strategies, user session storage, or auth DTOs unless requested.
+<%_ } _%>
+
+## Commands
+
+- Install dependencies: `<%= pmInstallCommand %>`
+- Start dev server: `<%= pmRunCommandPrefix %> start:dev`
+- Build: `<%= pmRunCommandPrefix %> build`
+- Lint: `<%= pmRunCommandPrefix %> lint`
+- Unit tests: `<%= pmRunCommandPrefix %> test`
+- E2E tests: `<%= pmRunCommandPrefix %> test:e2e`
+<%_ if (selectedOptionIds.includes('prisma')) { _%>
+- Prisma generate: `<%= pmRunCommandPrefix %> prisma:generate`
+- Prisma migration: `<%= pmRunCommandPrefix %> prisma:migrate`
+<%_ } _%>
+
+## Review Checklist
+
+- Does the change match the selected stack?
+- Did any unselected dependency, import, config, environment variable, file, or service appear?
+- Are Nest providers/controllers/modules wired completely?
+- Are DTO validation rules and tests updated when behavior changes?
+- Are generated or external artifacts avoided unless they are part of the selected stack?
