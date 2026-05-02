@@ -9,6 +9,7 @@ import {
   initializeGitRepository,
   runPackageManagerFormat,
   runPackageManagerInstall,
+  runPackageManagerScript,
 } from "../utils";
 import { BaseScaffolder } from "./base.scaffolder";
 
@@ -63,6 +64,26 @@ export class InitScaffolder extends BaseScaffolder {
             "Generated project formatting failed. Project files were still created successfully."
           )
         );
+      }
+
+      if (this.data.selections.orm === "prisma") {
+        const sPrismaGenerate = spinner();
+        sPrismaGenerate.start(`Generating Prisma client...`);
+        try {
+          sPrismaGenerate.stop("Prisma client generation started.");
+          await runPackageManagerScript(
+            targetDir,
+            this.data.packageManager,
+            "prisma:generate"
+          );
+          console.log(chalk.green("Prisma client generated successfully."));
+        } catch (error) {
+          console.log(
+            chalk.yellow(
+              "Prisma client generation failed. Project files were still created successfully."
+            )
+          );
+        }
       }
     }
 
