@@ -1,0 +1,86 @@
+import { Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { JwtModule } from '@nestjs/jwt';
+import { PassportModule } from '@nestjs/passport';
+import { UsersModule } from '../users/users.module';
+import { AUTH_SESSION_STORE } from './application/ports/auth-session-store.port';
+import { AUTH_TOKEN_SERVICE } from './application/ports/auth-token-service.port';
+import { PASSWORD_HASHER } from './application/ports/password-hasher.port';
+import { GetMeUseCase } from './application/use-cases/get-me.use-case';
+import { IssueAuthResponseUseCase } from './application/use-cases/issue-auth-response.use-case';
+import { LogoutUseCase } from './application/use-cases/logout.use-case';
+import { RefreshTokenUseCase } from './application/use-cases/refresh-token.use-case';
+import { RegisterUseCase } from './application/use-cases/register.use-case';
+import { ValidateUserUseCase } from './application/use-cases/validate-user.use-case';
+import { AuthTokenOrchestratorService } from './application/services/auth-token-orchestrator.service';
+import { AuthUserMapperService } from './application/services/auth-user-mapper.service';
+import { PasswordPolicyService } from './domain/services/password-policy.service';
+<%_ if (!selectedOptionIds.includes('redis')) { _%>
+import { PrismaAuthSessionStoreAdapter } from './infrastructure/cache/prisma-auth-session-store.adapter';
+<%_ } _%>
+<%_ if (selectedOptionIds.includes('redis')) { _%>
+import { RedisAuthSessionStoreAdapter } from './infrastructure/cache/redis-auth-session-store.adapter';
+<%_ } _%>
+import { JwtAuthTokenAdapter } from './infrastructure/security/jwt-auth-token.adapter';
+import { ScryptPasswordHasherAdapter } from './infrastructure/security/scrypt-password-hasher.adapter';
+import { AuthController } from './presentation/http/auth.controller';
+import { JwtAuthGuard } from './presentation/http/guards/jwt-auth.guard';
+import { LocalAuthGuard } from './presentation/http/guards/local-auth.guard';
+import { JwtStrategy } from './presentation/http/strategies/jwt.strategy';
+import { LocalStrategy } from './presentation/http/strategies/local.strategy';
+
+@Module({
+  imports: [
+    ConfigModule,
+    PassportModule,
+    UsersModule,
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        secret: configService.getOrThrow<string>('JWT_ACCESS_SECRET'),
+      }),
+    }),
+  ],
+  controllers: [AuthController],
+  providers: [
+    RegisterUseCase,
+    ValidateUserUseCase,
+    IssueAuthResponseUseCase,
+    RefreshTokenUseCase,
+    LogoutUseCase,
+    GetMeUseCase,
+    AuthTokenOrchestratorService,
+    AuthUserMapperService,
+    PasswordPolicyService,
+    JwtAuthGuard,
+    LocalAuthGuard,
+    JwtStrategy,
+    LocalStrategy,
+    {
+      provide: PASSWORD_HASHER,
+      useClass: ScryptPasswordHasherAdapter,
+    },
+    {
+      provide: AUTH_TOKEN_SERVICE,
+      useClass: JwtAuthTokenAdapter,
+    },
+    {
+      provide: AUTH_SESSION_STORE,
+<%_ if (selectedOptionIds.includes('redis')) { _%>
+      useClass: RedisAuthSessionStoreAdapter,
+<%_ } else { _%>
+      useClass: PrismaAuthSessionStoreAdapter,
+<%_ } _%>
+    },
+  ],
+  exports: [
+    RegisterUseCase,
+    ValidateUserUseCase,
+    IssueAuthResponseUseCase,
+    RefreshTokenUseCase,
+    LogoutUseCase,
+    GetMeUseCase,
+  ],
+})
+export class AuthModule {}

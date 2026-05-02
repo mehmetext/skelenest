@@ -1,0 +1,26 @@
+import type { User } from 'src/generated/prisma/client';
+import { Injectable } from '@nestjs/common';
+import type { AuthResponseDto, AuthUserDto } from '../dto/auth.dto';
+
+@Injectable()
+export class AuthUserMapperService {
+  toAuthResponse(
+    user: User,
+    tokens: { accessToken: string; refreshToken: string },
+  ): AuthResponseDto {
+    return {
+      user: this.toAuthUser(user),
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+    };
+  }
+
+  toAuthUser(user: User): AuthUserDto {
+    return {
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+    };
+  }
+}

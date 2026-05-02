@@ -1,0 +1,35 @@
+import { Inject, Injectable } from '@nestjs/common';
+import { UsersService } from '../../../users/application/users.service';
+import {
+  PASSWORD_HASHER,
+  PasswordHasher,
+} from '../ports/password-hasher.port';
+import type { AuthenticatedRequestUser } from '../../types';
+
+@Injectable()
+export class ValidateUserUseCase {
+  constructor(
+    private readonly usersService: UsersService,
+    @Inject(PASSWORD_HASHER)
+    private readonly passwordHasher: PasswordHasher,
+  ) {}
+
+  async execute(
+    email?: string,
+    password?: string,
+  ): Promise<AuthenticatedRequestUser | null> {
+    const normalizedEmail = email?.trim().toLowerCase();
+    if (!normalizedEmail?.includes('@') || !password) return null;
+
+    const user = await this.usersService.findByEmail(normalizedEmail);
+    if (!user) return null;
+
+    const isValid = await this.passwordHasher.verify(
+      password,
+      user.passwordHash,
+    );
+    if (!isValid) return null;
+
+    return { id: user.id, email: user.email, jti: '', tokenExp: 0 };
+  }
+}

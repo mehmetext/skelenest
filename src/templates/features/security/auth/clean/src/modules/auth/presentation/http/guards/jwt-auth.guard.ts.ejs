@@ -1,0 +1,29 @@
+import { Inject, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
+import {
+  AUTH_SESSION_STORE,
+  AuthSessionStore,
+} from '../../../application/ports/auth-session-store.port';
+import type { AuthenticatedRequestUser } from '../../../types';
+
+@Injectable()
+export class JwtAuthGuard extends AuthGuard('jwt') {
+  constructor(
+    @Inject(AUTH_SESSION_STORE)
+    private readonly authSessionStore: AuthSessionStore,
+  ) {
+    super();
+  }
+
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const result = await (super.canActivate(context) as Promise<boolean>);
+    if (!result) return false;
+
+    const request = context.switchToHttp().getRequest();
+    const user = request.user as AuthenticatedRequestUser;
+    const blocked = await this.authSessionStore.isAccessTokenBlocked(user.jti);
+    if (blocked) throw new UnauthorizedException('Token has been revoked');
+
+    return true;
+  }
+}

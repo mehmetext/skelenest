@@ -1,0 +1,40 @@
+import type { User } from 'src/generated/prisma/client';
+import { Inject, Injectable } from '@nestjs/common';
+import {
+  AUTH_SESSION_STORE,
+  AuthSessionStore,
+} from '../ports/auth-session-store.port';
+import {
+  AUTH_TOKEN_SERVICE,
+  AuthTokenService,
+} from '../ports/auth-token-service.port';
+
+@Injectable()
+export class AuthTokenOrchestratorService {
+  constructor(
+    @Inject(AUTH_TOKEN_SERVICE)
+    private readonly authTokenService: AuthTokenService,
+    @Inject(AUTH_SESSION_STORE)
+    private readonly authSessionStore: AuthSessionStore,
+  ) {}
+
+  async issueForUser(user: User) {
+    const tokens = await this.authTokenService.issueTokens({
+      userId: user.id,
+      email: user.email,
+    });
+
+    await this.authSessionStore.persistRefreshToken({
+      refreshToken: tokens.refreshToken,
+      payload: {
+        sub: user.id,
+        jti: tokens.refreshTokenJti,
+        type: 'refresh',
+      },
+      userId: user.id,
+      ttlSeconds: tokens.refreshTokenTtlSeconds,
+    });
+
+    return tokens;
+  }
+}

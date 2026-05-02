@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "architecture": "<%= selections.architecture %>",
+  "orm": <%- JSON.stringify(selections.orm === 'none' ? null : selections.orm) %>,
+  "features": <%- JSON.stringify(Array.isArray(selections.features) ? selections.features : []) %>,
+  "modules": <%- JSON.stringify(Array.isArray(selections.modules) ? selections.modules : []) %>
+}

@@ -1,0 +1,23 @@
+import type { AuthUserDto } from '../dto/auth.dto';
+import type { RefreshTokenPayload } from '../../types';
+
+export interface AuthSessionStore {
+  persistRefreshToken(input: {
+    refreshToken: string;
+    payload: RefreshTokenPayload;
+    userId: string;
+    ttlSeconds: number;
+  }): Promise<void>;
+  validateRefreshToken(input: {
+    refreshToken: string;
+    payload: RefreshTokenPayload;
+  }): Promise<{ jti: string; userId: string } | null>;
+  revokeRefreshToken(refreshToken: string): Promise<void>;
+  blockAccessToken(jti: string, ttlSeconds: number): Promise<void>;
+  isAccessTokenBlocked(jti: string): Promise<boolean>;
+  getCachedUser(userId: string): Promise<AuthUserDto | null>;
+  cacheUser(userId: string, user: AuthUserDto): Promise<void>;
+  clearCachedUser(userId: string): Promise<void>;
+}
+
+export const AUTH_SESSION_STORE = Symbol('AUTH_SESSION_STORE');

@@ -1,0 +1,26 @@
+export const BLOCKLIST_KEY = (jti: string) => `auth:blocklist:${jti}`;
+export const REFRESH_KEY = (hash: string) => `auth:refresh:${hash}`;
+export const USER_CACHE_KEY = (userId: string) => `auth:user:${userId}`;
+
+export const USER_CACHE_TTL_SECONDS = 120;
+
+export const JWT_ACCESS_TTL_DEFAULT = "15m";
+export const JWT_REFRESH_TTL_DEFAULT = "7d";
+
+export const PASSWORD_MIN_LENGTH = 8;
+export const PASSWORD_SALT_BYTES = 16;
+export const PASSWORD_DERIVED_KEY_BYTES = 64;
+export const TOKEN_ID_BYTES = 24;
+
+export const DURATION_MULTIPLIERS = {
+  s: 1,
+  m: 60,
+  h: 3600,
+  d: 86400,
+} as const;
+
+export const VALIDATION = {
+  EMAIL_MAX_LENGTH: 255,
+  PASSWORD_MAX_LENGTH: 128,
+  NAME_MAX_LENGTH: 50,
+} as const;

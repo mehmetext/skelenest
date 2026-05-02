@@ -1,0 +1,16 @@
+import type { User } from 'src/generated/prisma/client';
+
+export interface CreateUserInput {
+  email: string;
+  passwordHash: string;
+  firstName?: string | null;
+  lastName?: string | null;
+}
+
+export interface UsersRepository {
+  findById(id: string): Promise<User | null>;
+  findByEmail(email: string): Promise<User | null>;
+  create(input: CreateUserInput): Promise<User>;
+}
+
+export const USERS_REPOSITORY = Symbol('USERS_REPOSITORY');

@@ -1,0 +1,31 @@
+import type { User } from 'src/generated/prisma/client';
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from 'src/prisma/prisma.service';
+import type {
+  CreateUserInput,
+  UsersRepository,
+} from '../../application/ports/users-repository.port';
+
+@Injectable()
+export class PrismaUsersRepository implements UsersRepository {
+  constructor(private readonly prisma: PrismaService) {}
+
+  findById(id: string): Promise<User | null> {
+    return this.prisma.user.findUnique({ where: { id } });
+  }
+
+  findByEmail(email: string): Promise<User | null> {
+    return this.prisma.user.findUnique({ where: { email } });
+  }
+
+  create(input: CreateUserInput): Promise<User> {
+    return this.prisma.user.create({
+      data: {
+        email: input.email,
+        passwordHash: input.passwordHash,
+        firstName: input.firstName ?? null,
+        lastName: input.lastName ?? null,
+      },
+    });
+  }
+}

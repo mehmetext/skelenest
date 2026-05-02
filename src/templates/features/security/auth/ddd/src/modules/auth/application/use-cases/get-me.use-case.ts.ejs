@@ -1,0 +1,30 @@
+import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import { UsersService } from '../../../users/application/users.service';
+import type { AuthUserDto } from '../dto/auth.dto';
+import {
+  AUTH_SESSION_STORE,
+  AuthSessionStore,
+} from '../ports/auth-session-store.port';
+import { AuthUserMapperService } from '../services/auth-user-mapper.service';
+
+@Injectable()
+export class GetMeUseCase {
+  constructor(
+    private readonly usersService: UsersService,
+    @Inject(AUTH_SESSION_STORE)
+    private readonly authSessionStore: AuthSessionStore,
+    private readonly authUserMapper: AuthUserMapperService,
+  ) {}
+
+  async execute(userId: string): Promise<AuthUserDto> {
+    const cached = await this.authSessionStore.getCachedUser(userId);
+    if (cached) return cached;
+
+    const user = await this.usersService.findById(userId);
+    if (!user) throw new UnauthorizedException('User not found');
+
+    const authUser = this.authUserMapper.toAuthUser(user);
+    await this.authSessionStore.cacheUser(userId, authUser);
+    return authUser;
+  }
+}

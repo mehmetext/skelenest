@@ -9,6 +9,11 @@ export interface CopyTemplateTreeOptions {
   slots?: Record<string, string[]>;
 }
 
+interface ConditionalTemplateResolution {
+  include: boolean;
+  relativePath: string;
+}
+
 function normalizeRenderedTemplate(rendered: string): string {
   const normalizedNewlines = rendered.replace(/\r\n/g, "\n");
   const trimmedLineEnds = normalizedNewlines.replace(/[ \t]+$/gm, "");
@@ -53,6 +58,49 @@ async function listFilesRecursive(dir: string): Promise<string[]> {
   return files;
 }
 
+function resolveConditionalTemplatePath(
+  relativePath: string,
+  selectedOptionIds: string[]
+): ConditionalTemplateResolution {
+  const segments = relativePath.split(path.sep);
+  const rewrittenSegments = segments.map((segment) => {
+    const whenMatch = segment.match(/^(.*)\.when-([a-z0-9-]+)(\.[^.]+(?:\.[^.]+)?)$/i);
+    if (whenMatch) {
+      return {
+        include: selectedOptionIds.includes(whenMatch[2]),
+        segment: `${whenMatch[1]}${whenMatch[3]}`,
+      };
+    }
+
+    const unlessMatch = segment.match(
+      /^(.*)\.unless-([a-z0-9-]+)(\.[^.]+(?:\.[^.]+)?)$/i
+    );
+    if (unlessMatch) {
+      return {
+        include: !selectedOptionIds.includes(unlessMatch[2]),
+        segment: `${unlessMatch[1]}${unlessMatch[3]}`,
+      };
+    }
+
+    return {
+      include: true,
+      segment,
+    };
+  });
+
+  if (rewrittenSegments.some((entry) => !entry.include)) {
+    return {
+      include: false,
+      relativePath,
+    };
+  }
+
+  return {
+    include: true,
+    relativePath: rewrittenSegments.map((entry) => entry.segment).join(path.sep),
+  };
+}
+
 /**
  * Copies every file under `templateRoot` into `outputRoot`, rendering `*.ejs`
  * with `data` and writing the output without the `.ejs` suffix.
@@ -61,6 +109,11 @@ export async function copyTemplateTree(
   options: CopyTemplateTreeOptions
 ): Promise<void> {
   const { templateRoots, outputRoot, data, slots = {} } = options;
+  const selectedOptionIds = Array.isArray(data.selectedOptionIds)
+    ? data.selectedOptionIds.filter(
+        (value): value is string => typeof value === "string"
+      )
+    : [];
 
   for (const templateRoot of templateRoots) {
     const exists = await fs.pathExists(templateRoot);
@@ -76,13 +129,21 @@ export async function copyTemplateTree(
 
     for (const filePath of files) {
       const relative = path.relative(templateRoot, filePath);
-      const destRelative = relative.endsWith(".ejs")
-        ? relative.slice(0, -".ejs".length)
-        : relative;
+      const conditionalResolution = resolveConditionalTemplatePath(
+        relative,
+        selectedOptionIds
+      );
+      if (!conditionalResolution.include) {
+        continue;
+      }
+
+      const destRelative = conditionalResolution.relativePath.endsWith(".ejs")
+        ? conditionalResolution.relativePath.slice(0, -".ejs".length)
+        : conditionalResolution.relativePath;
       const destPath = path.join(outputRoot, destRelative);
       await fs.ensureDir(path.dirname(destPath));
 
-      if (relative.endsWith(".ejs")) {
+      if (conditionalResolution.relativePath.endsWith(".ejs")) {
         const template = await fs.readFile(filePath, "utf8");
         const rendered = ejs.render(template, {
           ...data,

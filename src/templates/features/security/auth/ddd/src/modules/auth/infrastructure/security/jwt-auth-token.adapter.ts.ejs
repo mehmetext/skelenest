@@ -1,0 +1,108 @@
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
+import { randomBytes } from 'crypto';
+import {
+  DURATION_MULTIPLIERS,
+  JWT_ACCESS_TTL_DEFAULT,
+  JWT_REFRESH_TTL_DEFAULT,
+  TOKEN_ID_BYTES,
+} from '../../auth.constants';
+import type {
+  AuthTokenService,
+  IssuedAuthTokens,
+} from '../../application/ports/auth-token-service.port';
+import type {
+  AccessTokenPayload,
+  RefreshTokenPayload,
+} from '../../types';
+
+@Injectable()
+export class JwtAuthTokenAdapter implements AuthTokenService {
+  private readonly logger = new Logger(JwtAuthTokenAdapter.name);
+  private readonly accessSecret: string;
+  private readonly refreshSecret: string;
+  private readonly accessTtlSeconds: number;
+  private readonly refreshTtlSeconds: number;
+
+  constructor(
+    private readonly jwtService: JwtService,
+    configService: ConfigService,
+  ) {
+    this.accessSecret = configService.getOrThrow<string>('JWT_ACCESS_SECRET');
+    this.refreshSecret = configService.getOrThrow<string>('JWT_REFRESH_SECRET');
+    this.accessTtlSeconds = this.parseDurationSeconds(
+      configService.get<string>('JWT_ACCESS_TTL', JWT_ACCESS_TTL_DEFAULT),
+    );
+    this.refreshTtlSeconds = this.parseDurationSeconds(
+      configService.get<string>('JWT_REFRESH_TTL', JWT_REFRESH_TTL_DEFAULT),
+    );
+  }
+
+  async issueTokens(input: {
+    userId: string;
+    email: string;
+  }): Promise<IssuedAuthTokens> {
+    const accessPayload: Omit<AccessTokenPayload, 'exp'> = {
+      sub: input.userId,
+      email: input.email,
+      jti: this.createTokenId(),
+      type: 'access',
+    };
+    const refreshPayload: RefreshTokenPayload = {
+      sub: input.userId,
+      jti: this.createTokenId(),
+      type: 'refresh',
+    };
+
+    const [accessToken, refreshToken] = await Promise.all([
+      this.jwtService.signAsync(accessPayload, {
+        secret: this.accessSecret,
+        expiresIn: this.accessTtlSeconds,
+      }),
+      this.jwtService.signAsync(refreshPayload, {
+        secret: this.refreshSecret,
+        expiresIn: this.refreshTtlSeconds,
+      }),
+    ]);
+
+    return {
+      accessToken,
+      refreshToken,
+      refreshTokenJti: refreshPayload.jti,
+      refreshTokenTtlSeconds: this.refreshTtlSeconds,
+    };
+  }
+
+  async verifyRefreshToken(refreshToken: string): Promise<RefreshTokenPayload> {
+    try {
+      const payload = await this.jwtService.verifyAsync<RefreshTokenPayload>(
+        refreshToken,
+        { secret: this.refreshSecret },
+      );
+      if (payload.type !== 'refresh') throw new Error('Not a refresh token');
+      return payload;
+    } catch (error) {
+      this.logger.debug(
+        'Refresh token verification failed',
+        error instanceof Error ? error.message : String(error),
+      );
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+  }
+
+  private createTokenId(): string {
+    return randomBytes(TOKEN_ID_BYTES).toString('hex');
+  }
+
+  private parseDurationSeconds(duration: string): number {
+    const match = /^(\d+)([smhd])$/.exec(duration);
+    if (!match) throw new Error('JWT TTL must use s, m, h, or d suffix');
+
+    const value = Number(match[1]);
+    return (
+      value *
+      DURATION_MULTIPLIERS[match[2] as keyof typeof DURATION_MULTIPLIERS]
+    );
+  }
+}

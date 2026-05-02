@@ -1,0 +1,45 @@
+import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import { UsersService } from '../../../users/application/users.service';
+import type { AuthResponseDto } from '../dto/auth.dto';
+import {
+  AUTH_SESSION_STORE,
+  AuthSessionStore,
+} from '../ports/auth-session-store.port';
+import {
+  AUTH_TOKEN_SERVICE,
+  AuthTokenService,
+} from '../ports/auth-token-service.port';
+import { AuthTokenOrchestratorService } from '../services/auth-token-orchestrator.service';
+import { AuthUserMapperService } from '../services/auth-user-mapper.service';
+
+@Injectable()
+export class RefreshTokenUseCase {
+  constructor(
+    private readonly usersService: UsersService,
+    @Inject(AUTH_TOKEN_SERVICE)
+    private readonly authTokenService: AuthTokenService,
+    @Inject(AUTH_SESSION_STORE)
+    private readonly authSessionStore: AuthSessionStore,
+    private readonly authTokenOrchestrator: AuthTokenOrchestratorService,
+    private readonly authUserMapper: AuthUserMapperService,
+  ) {}
+
+  async execute(refreshToken: string): Promise<AuthResponseDto> {
+    const payload = await this.authTokenService.verifyRefreshToken(refreshToken);
+    const session = await this.authSessionStore.validateRefreshToken({
+      refreshToken,
+      payload,
+    });
+
+    if (!session || session.jti !== payload.jti) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    const user = await this.usersService.findById(session.userId);
+    if (!user) throw new UnauthorizedException('Invalid refresh token');
+
+    await this.authSessionStore.revokeRefreshToken(refreshToken);
+    const tokens = await this.authTokenOrchestrator.issueForUser(user);
+    return this.authUserMapper.toAuthResponse(user, tokens);
+  }
+}

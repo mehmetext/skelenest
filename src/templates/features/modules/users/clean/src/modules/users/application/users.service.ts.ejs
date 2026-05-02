@@ -1,0 +1,27 @@
+import type { User } from 'src/generated/prisma/client';
+import { Inject, Injectable } from '@nestjs/common';
+import {
+  CreateUserInput,
+  USERS_REPOSITORY,
+  UsersRepository,
+} from './ports/users-repository.port';
+
+@Injectable()
+export class UsersService {
+  constructor(
+    @Inject(USERS_REPOSITORY)
+    private readonly usersRepository: UsersRepository,
+  ) {}
+
+  findById(id: string): Promise<User | null> {
+    return this.usersRepository.findById(id);
+  }
+
+  findByEmail(email: string): Promise<User | null> {
+    return this.usersRepository.findByEmail(email);
+  }
+
+  createUser(input: CreateUserInput): Promise<User> {
+    return this.usersRepository.create(input);
+  }
+}

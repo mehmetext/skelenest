@@ -1,0 +1,46 @@
+import type { User } from 'src/generated/prisma/client';
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from 'src/prisma/prisma.service';
+import type {
+  CreateUserInput,
+  UsersRepository,
+} from '../../application/ports/users-repository.port';
+import type { UserEntity } from '../../domain/entities/user.entity';
+
+@Injectable()
+export class PrismaUsersRepository implements UsersRepository {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async findById(id: string): Promise<UserEntity | null> {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    return user ? this.toEntity(user) : null;
+  }
+
+  async findByEmail(email: string): Promise<UserEntity | null> {
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    return user ? this.toEntity(user) : null;
+  }
+
+  async create(input: CreateUserInput): Promise<UserEntity> {
+    const user = await this.prisma.user.create({
+      data: {
+        email: input.email,
+        passwordHash: input.passwordHash,
+        firstName: input.firstName ?? null,
+        lastName: input.lastName ?? null,
+      },
+    });
+
+    return this.toEntity(user);
+  }
+
+  private toEntity(user: User): UserEntity {
+    return {
+      id: user.id,
+      email: user.email,
+      passwordHash: user.passwordHash,
+      firstName: user.firstName,
+      lastName: user.lastName,
+    };
+  }
+}

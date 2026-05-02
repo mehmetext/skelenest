@@ -89,18 +89,4 @@ export const featureOptions: TechnologyOption<InitPromptData>[] = [
       },
     }),
   },
-  {
-    id: "auth",
-    label: "Auth Starter Skeleton",
-    description: "Adds a minimal auth module skeleton for future expansion",
-    contribute: () => ({
-      templateRoots: [featureTemplateRoot("security", "auth")],
-      slots: {
-        "app.module.imports": [
-          "import { AuthModule } from './auth/auth.module';",
-        ],
-        "app.module.moduleImports": ["AuthModule"],
-      },
-    }),
-  },
 ];

@@ -1,0 +1,78 @@
+import { InjectRedis } from '@nestjs-modules/ioredis';
+import { Injectable } from '@nestjs/common';
+import { createHash } from 'crypto';
+import { Redis } from 'ioredis';
+import {
+  BLOCKLIST_KEY,
+  REFRESH_KEY,
+  USER_CACHE_KEY,
+  USER_CACHE_TTL_SECONDS,
+} from '../../auth.constants';
+import type { AuthUserDto } from '../../application/dto/auth.dto';
+import type { AuthSessionStore } from '../../application/ports/auth-session-store.port';
+import type { RefreshTokenPayload } from '../../types';
+
+@Injectable()
+export class RedisAuthSessionStoreAdapter implements AuthSessionStore {
+  constructor(@InjectRedis() private readonly redis: Redis) {}
+
+  async persistRefreshToken(input: {
+    refreshToken: string;
+    payload: RefreshTokenPayload;
+    userId: string;
+    ttlSeconds: number;
+  }): Promise<void> {
+    await this.redis.set(
+      REFRESH_KEY(this.hashToken(input.refreshToken)),
+      JSON.stringify({ jti: input.payload.jti, userId: input.userId }),
+      'EX',
+      input.ttlSeconds,
+    );
+  }
+
+  async validateRefreshToken(input: {
+    refreshToken: string;
+    payload: RefreshTokenPayload;
+  }): Promise<{ jti: string; userId: string } | null> {
+    const stored = await this.redis.get(REFRESH_KEY(this.hashToken(input.refreshToken)));
+    if (!stored) return null;
+    return JSON.parse(stored) as { jti: string; userId: string };
+  }
+
+  async revokeRefreshToken(refreshToken: string): Promise<void> {
+    await this.redis.del(REFRESH_KEY(this.hashToken(refreshToken)));
+  }
+
+  async blockAccessToken(jti: string, ttlSeconds: number): Promise<void> {
+    if (ttlSeconds > 0) {
+      await this.redis.set(BLOCKLIST_KEY(jti), '1', 'EX', ttlSeconds);
+    }
+  }
+
+  async isAccessTokenBlocked(jti: string): Promise<boolean> {
+    const blocked = await this.redis.exists(BLOCKLIST_KEY(jti));
+    return blocked > 0;
+  }
+
+  async getCachedUser(userId: string): Promise<AuthUserDto | null> {
+    const cached = await this.redis.get(USER_CACHE_KEY(userId));
+    return cached ? (JSON.parse(cached) as AuthUserDto) : null;
+  }
+
+  async cacheUser(userId: string, user: AuthUserDto): Promise<void> {
+    await this.redis.set(
+      USER_CACHE_KEY(userId),
+      JSON.stringify(user),
+      'EX',
+      USER_CACHE_TTL_SECONDS,
+    );
+  }
+
+  async clearCachedUser(userId: string): Promise<void> {
+    await this.redis.del(USER_CACHE_KEY(userId));
+  }
+
+  private hashToken(token: string): string {
+    return createHash('sha256').update(token).digest('hex');
+  }
+}

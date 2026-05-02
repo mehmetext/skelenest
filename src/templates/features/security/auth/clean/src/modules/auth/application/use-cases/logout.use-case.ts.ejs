@@ -1,0 +1,31 @@
+import { Inject, Injectable } from '@nestjs/common';
+import {
+  AUTH_SESSION_STORE,
+  AuthSessionStore,
+} from '../ports/auth-session-store.port';
+
+@Injectable()
+export class LogoutUseCase {
+  constructor(
+    @Inject(AUTH_SESSION_STORE)
+    private readonly authSessionStore: AuthSessionStore,
+  ) {}
+
+  async execute(input: {
+    userId: string;
+    refreshToken: string;
+    accessTokenJti: string;
+    accessTokenExp: number;
+  }): Promise<void> {
+    const ttl = Math.max(
+      0,
+      input.accessTokenExp - Math.floor(Date.now() / 1000),
+    );
+
+    await Promise.all([
+      this.authSessionStore.revokeRefreshToken(input.refreshToken),
+      this.authSessionStore.clearCachedUser(input.userId),
+      this.authSessionStore.blockAccessToken(input.accessTokenJti, ttl),
+    ]);
+  }
+}

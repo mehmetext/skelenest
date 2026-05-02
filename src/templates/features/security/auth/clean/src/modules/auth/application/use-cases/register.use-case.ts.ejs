@@ -1,0 +1,54 @@
+import { Inject, Injectable, BadRequestException, ConflictException } from '@nestjs/common';
+import { UsersService } from '../../../users/application/users.service';
+import type { AuthResponseDto, RegisterDto } from '../dto/auth.dto';
+import {
+  PASSWORD_HASHER,
+  PasswordHasher,
+} from '../ports/password-hasher.port';
+import { AuthTokenOrchestratorService } from '../services/auth-token-orchestrator.service';
+import { AuthUserMapperService } from '../services/auth-user-mapper.service';
+
+@Injectable()
+export class RegisterUseCase {
+  constructor(
+    private readonly usersService: UsersService,
+    @Inject(PASSWORD_HASHER)
+    private readonly passwordHasher: PasswordHasher,
+    private readonly authTokenOrchestrator: AuthTokenOrchestratorService,
+    private readonly authUserMapper: AuthUserMapperService,
+  ) {}
+
+  async execute(dto: RegisterDto): Promise<AuthResponseDto> {
+    const email = this.normalizeEmail(dto?.email);
+    this.assertPassword(dto?.password);
+
+    const existingUser = await this.usersService.findByEmail(email);
+    if (existingUser) {
+      throw new ConflictException('Email is already registered');
+    }
+
+    const user = await this.usersService.createUser({
+      email,
+      passwordHash: await this.passwordHasher.hash(dto.password),
+      firstName: dto.firstName?.trim() || null,
+      lastName: dto.lastName?.trim() || null,
+    });
+
+    const tokens = await this.authTokenOrchestrator.issueForUser(user);
+    return this.authUserMapper.toAuthResponse(user, tokens);
+  }
+
+  private normalizeEmail(email?: string): string {
+    const normalized = email?.trim().toLowerCase();
+    if (!normalized?.includes('@')) {
+      throw new BadRequestException('A valid email is required');
+    }
+    return normalized;
+  }
+
+  private assertPassword(password?: string): void {
+    if (!password || password.length < 8) {
+      throw new BadRequestException('Password must be at least 8 characters');
+    }
+  }
+}

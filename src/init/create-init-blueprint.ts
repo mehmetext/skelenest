@@ -119,6 +119,7 @@ export function createInitBlueprint(
       projectDisplayName,
       port: data.port,
       helloMessage,
+      selections: data.selections,
       pmInstallCommand: selectedPackageManager.pmInstallCommand,
       pmRunCommandPrefix: selectedPackageManager.pmRunCommand,
       pmGlobalInstallCommandPrefix:
@@ -143,12 +144,19 @@ export function createInitBlueprint(
     }) => ({
       ...templateData,
       selectionSummary: {
+        architecture:
+          selectionState.selectedTechnologies.find(
+            (technology) => technology.groupId === "architecture"
+          )?.option.label ?? "Standard",
         orm:
           selectionState.selectedTechnologies.find(
             (technology) => technology.groupId === "orm"
           )?.option.label ?? null,
         features: selectionState.selectedTechnologies
           .filter((technology) => technology.groupId === "features")
+          .map((technology) => technology.option.label),
+        modules: selectionState.selectedTechnologies
+          .filter((technology) => technology.groupId === "modules")
           .map((technology) => technology.option.label),
       },
       packageJson: `${JSON.stringify(packageJson, null, 2)}\n`,

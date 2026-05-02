@@ -1,0 +1,417 @@
+import type { User } from "src/generated/prisma/client";
+import { PrismaService } from "src/prisma/prisma.service";
+import { CreateUserInput, UsersService } from "../users/users.service";
+<%_ const includesRedis = selectedOptionIds.includes('redis'); _%>
+<%_ if (includesRedis) { _%>
+import { InjectRedis } from "@nestjs-modules/ioredis";
+<%_ } _%>
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  Logger,
+  UnauthorizedException,
+} from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { JwtService } from "@nestjs/jwt";
+import {
+  createHash,
+  randomBytes,
+  scrypt as scryptCallback,
+  timingSafeEqual,
+} from "crypto";
+<%_ if (includesRedis) { _%>
+import { Redis } from "ioredis";
+<%_ } _%>
+import { promisify } from "util";
+import {
+<%_ if (includesRedis) { _%>
+  BLOCKLIST_KEY,
+<%_ } _%>
+  DURATION_MULTIPLIERS,
+  JWT_ACCESS_TTL_DEFAULT,
+  JWT_REFRESH_TTL_DEFAULT,
+  PASSWORD_DERIVED_KEY_BYTES,
+  PASSWORD_MIN_LENGTH,
+  PASSWORD_SALT_BYTES,
+<%_ if (includesRedis) { _%>
+  REFRESH_KEY,
+<%_ } _%>
+  TOKEN_ID_BYTES,
+<%_ if (includesRedis) { _%>
+  USER_CACHE_KEY,
+  USER_CACHE_TTL_SECONDS,
+<%_ } _%>
+} from "./auth.constants";
+import type {
+  AuthResponseDto,
+  AuthTokensDto,
+  AuthUserDto,
+  RegisterDto,
+} from "./dto/auth.dto";
+import type {
+  AccessTokenPayload,
+  AuthenticatedRequestUser,
+  RefreshTokenPayload,
+} from "./types";
+
+const scrypt = promisify(scryptCallback);
+
+@Injectable()
+export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+  private readonly accessSecret: string;
+  private readonly refreshSecret: string;
+  private readonly accessTtlSeconds: number;
+  private readonly refreshTtlSeconds: number;
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly usersService: UsersService,
+    private readonly jwtService: JwtService,
+<%_ if (includesRedis) { _%>
+    @InjectRedis() private readonly redis: Redis,
+<%_ } _%>
+    configService: ConfigService
+  ) {
+    this.accessSecret = configService.getOrThrow<string>("JWT_ACCESS_SECRET");
+    this.refreshSecret = configService.getOrThrow<string>("JWT_REFRESH_SECRET");
+    this.accessTtlSeconds = this.parseDurationSeconds(
+      configService.get<string>("JWT_ACCESS_TTL", JWT_ACCESS_TTL_DEFAULT)
+    );
+    this.refreshTtlSeconds = this.parseDurationSeconds(
+      configService.get<string>("JWT_REFRESH_TTL", JWT_REFRESH_TTL_DEFAULT)
+    );
+  }
+
+  async register(dto: RegisterDto): Promise<AuthResponseDto> {
+    const email = this.normalizeEmail(dto?.email);
+    this.assertPassword(dto?.password);
+
+    const existingUser = await this.usersService.findByEmail(email);
+    if (existingUser) {
+      throw new ConflictException("Email is already registered");
+    }
+
+    const user = await this.usersService.createUser({
+      email,
+      passwordHash: await this.hashPassword(dto.password),
+      firstName: dto.firstName?.trim() || null,
+      lastName: dto.lastName?.trim() || null,
+    } satisfies CreateUserInput);
+
+    const tokens = await this.issueTokens(user);
+    return this.toAuthResponse(user, tokens);
+  }
+
+  async validateUser(
+    email?: string,
+    password?: string
+  ): Promise<AuthenticatedRequestUser | null> {
+    const normalizedEmail = this.tryNormalizeEmail(email);
+    if (!normalizedEmail || !password) return null;
+
+    const user = await this.usersService.findByEmail(normalizedEmail);
+    if (!user || !(await this.verifyPassword(password, user.passwordHash))) {
+      return null;
+    }
+
+    return { id: user.id, email: user.email, jti: "", tokenExp: 0 };
+  }
+
+  async issueAuthResponse(userId: string): Promise<AuthResponseDto> {
+    const user = await this.usersService.findById(userId);
+    if (!user) throw new UnauthorizedException("User not found");
+
+    const tokens = await this.issueTokens(user);
+    return this.toAuthResponse(user, tokens);
+  }
+
+  async refresh(refreshToken: string): Promise<AuthResponseDto> {
+    const payload = await this.verifyRefreshToken(refreshToken);
+<%_ if (includesRedis) { _%>
+    const key = REFRESH_KEY(this.hashToken(refreshToken));
+
+    const stored = await this.redis.get(key);
+    if (!stored) throw new UnauthorizedException("Invalid refresh token");
+
+    const { jti, userId } = JSON.parse(stored) as {
+      jti: string;
+      userId: string;
+    };
+    if (jti !== payload.jti) {
+      throw new UnauthorizedException("Invalid refresh token");
+    }
+
+    const user = await this.usersService.findById(userId);
+    if (!user) throw new UnauthorizedException("Invalid refresh token");
+
+    await this.redis.del(key);
+    const tokens = await this.issueTokens(user);
+<%_ } else { _%>
+    const session = await this.prisma.refreshSession.findUnique({
+      where: {
+        tokenHash: this.hashToken(refreshToken),
+      },
+      select: {
+        jti: true,
+        userId: true,
+        revokedAt: true,
+        expiresAt: true,
+      },
+    });
+    if (!session || session.revokedAt || session.expiresAt.getTime() <= Date.now()) {
+      throw new UnauthorizedException("Invalid refresh token");
+    }
+    if (session.jti !== payload.jti) {
+      throw new UnauthorizedException("Invalid refresh token");
+    }
+
+    const user = await this.usersService.findById(session.userId);
+    if (!user) throw new UnauthorizedException("Invalid refresh token");
+
+    await this.prisma.refreshSession.updateMany({
+      where: {
+        tokenHash: this.hashToken(refreshToken),
+        revokedAt: null,
+      },
+      data: {
+        revokedAt: new Date(),
+      },
+    });
+    const tokens = await this.issueTokens(user);
+<%_ } _%>
+
+    return {
+      user: this.toAuthUser(user),
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+    };
+  }
+
+  async logout(
+    userId: string,
+    refreshToken: string,
+    accessTokenJti: string,
+    accessTokenExp: number
+  ): Promise<void> {
+<%_ if (includesRedis) { _%>
+    const ttl = Math.max(0, accessTokenExp - Math.floor(Date.now() / 1000));
+
+    await Promise.all([
+      this.redis.del(REFRESH_KEY(this.hashToken(refreshToken))),
+      this.redis.del(USER_CACHE_KEY(userId)),
+      ttl > 0
+        ? this.redis.set(BLOCKLIST_KEY(accessTokenJti), "1", "EX", ttl)
+        : Promise.resolve(),
+    ]);
+<%_ } else { _%>
+    const ttl = Math.max(0, accessTokenExp - Math.floor(Date.now() / 1000));
+
+    await Promise.all([
+      this.prisma.refreshSession.updateMany({
+        where: {
+          tokenHash: this.hashToken(refreshToken),
+          revokedAt: null,
+        },
+        data: {
+          revokedAt: new Date(),
+        },
+      }),
+      ttl > 0
+        ? this.prisma.revokedAccessToken.upsert({
+            where: { jti: accessTokenJti },
+            update: {
+              expiresAt: new Date(Date.now() + ttl * 1000),
+            },
+            create: {
+              jti: accessTokenJti,
+              expiresAt: new Date(Date.now() + ttl * 1000),
+            },
+          })
+        : Promise.resolve(),
+      Promise.resolve(userId),
+    ]);
+<%_ } _%>
+  }
+
+  async getMe(userId: string): Promise<AuthUserDto> {
+<%_ if (includesRedis) { _%>
+    const cached = await this.redis.get(USER_CACHE_KEY(userId));
+    if (cached) return JSON.parse(cached) as AuthUserDto;
+<%_ } _%>
+
+    const user = await this.usersService.findById(userId);
+    if (!user) throw new UnauthorizedException("User not found");
+
+    const authUser = this.toAuthUser(user);
+<%_ if (includesRedis) { _%>
+    await this.redis.set(
+      USER_CACHE_KEY(userId),
+      JSON.stringify(authUser),
+      "EX",
+      USER_CACHE_TTL_SECONDS
+    );
+<%_ } _%>
+
+    return authUser;
+  }
+
+  private async issueTokens(user: User): Promise<AuthTokensDto> {
+    const accessPayload: Omit<AccessTokenPayload, "exp"> = {
+      sub: user.id,
+      email: user.email,
+      jti: this.createTokenId(),
+      type: "access",
+    };
+    const refreshPayload: RefreshTokenPayload = {
+      sub: user.id,
+      jti: this.createTokenId(),
+      type: "refresh",
+    };
+
+    const [accessToken, refreshToken] = await Promise.all([
+      this.jwtService.signAsync(accessPayload, {
+        secret: this.accessSecret,
+        expiresIn: this.accessTtlSeconds,
+      }),
+      this.jwtService.signAsync(refreshPayload, {
+        secret: this.refreshSecret,
+        expiresIn: this.refreshTtlSeconds,
+      }),
+    ]);
+
+<%_ if (includesRedis) { _%>
+    await this.redis.set(
+      REFRESH_KEY(this.hashToken(refreshToken)),
+      JSON.stringify({ jti: refreshPayload.jti, userId: user.id }),
+      "EX",
+      this.refreshTtlSeconds
+    );
+<%_ } else { _%>
+    await this.prisma.refreshSession.upsert({
+      where: {
+        tokenHash: this.hashToken(refreshToken),
+      },
+      update: {
+        jti: refreshPayload.jti,
+        userId: user.id,
+        expiresAt: new Date(Date.now() + this.refreshTtlSeconds * 1000),
+        revokedAt: null,
+      },
+      create: {
+        tokenHash: this.hashToken(refreshToken),
+        jti: refreshPayload.jti,
+        userId: user.id,
+        expiresAt: new Date(Date.now() + this.refreshTtlSeconds * 1000),
+      },
+    });
+<%_ } _%>
+
+    return { accessToken, refreshToken };
+  }
+
+  private async verifyRefreshToken(
+    refreshToken: string
+  ): Promise<RefreshTokenPayload> {
+    try {
+      const payload = await this.jwtService.verifyAsync<RefreshTokenPayload>(
+        refreshToken,
+        { secret: this.refreshSecret }
+      );
+      if (payload.type !== "refresh") throw new Error("Not a refresh token");
+      return payload;
+    } catch (error) {
+      this.logger.debug(
+        "Refresh token verification failed",
+        error instanceof Error ? error.message : String(error)
+      );
+      throw new UnauthorizedException("Invalid refresh token");
+    }
+  }
+
+  private tryNormalizeEmail(email?: string): string | undefined {
+    const normalized = email?.trim().toLowerCase();
+    return normalized?.includes("@") ? normalized : undefined;
+  }
+
+  private normalizeEmail(email?: string): string {
+    const normalized = this.tryNormalizeEmail(email);
+    if (!normalized) throw new BadRequestException("A valid email is required");
+    return normalized;
+  }
+
+  private assertPassword(password?: string): void {
+    if (!password || password.length < PASSWORD_MIN_LENGTH) {
+      throw new BadRequestException(
+        `Password must be at least ${PASSWORD_MIN_LENGTH} characters`
+      );
+    }
+  }
+
+  private async hashPassword(password: string): Promise<string> {
+    const salt = randomBytes(PASSWORD_SALT_BYTES).toString("hex");
+    const derivedKey = (await scrypt(
+      password,
+      salt,
+      PASSWORD_DERIVED_KEY_BYTES
+    )) as Buffer;
+    return `${salt}:${derivedKey.toString("hex")}`;
+  }
+
+  private async verifyPassword(
+    password: string,
+    passwordHash: string
+  ): Promise<boolean> {
+    const [salt, key] = passwordHash.split(":");
+    if (!salt || !key) return false;
+
+    const storedKey = Buffer.from(key, "hex");
+    const derivedKey = (await scrypt(
+      password,
+      salt,
+      PASSWORD_DERIVED_KEY_BYTES
+    )) as Buffer;
+
+    return (
+      storedKey.length === derivedKey.length &&
+      timingSafeEqual(storedKey, derivedKey)
+    );
+  }
+
+  private hashToken(token: string): string {
+    return createHash("sha256").update(token).digest("hex");
+  }
+
+  private createTokenId(): string {
+    return randomBytes(TOKEN_ID_BYTES).toString("hex");
+  }
+
+  private toAuthResponse(user: User, tokens: AuthTokensDto): AuthResponseDto {
+    return {
+      user: this.toAuthUser(user),
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+    };
+  }
+
+  private toAuthUser(user: User): AuthUserDto {
+    return {
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+    };
+  }
+
+  private parseDurationSeconds(duration: string): number {
+    const match = /^(\d+)([smhd])$/.exec(duration);
+    if (!match) throw new Error("JWT TTL must use s, m, h, or d suffix");
+
+    const value = Number(match[1]);
+    return (
+      value *
+      DURATION_MULTIPLIERS[match[2] as keyof typeof DURATION_MULTIPLIERS]
+    );
+  }
+}

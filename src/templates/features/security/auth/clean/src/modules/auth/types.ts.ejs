@@ -1,0 +1,20 @@
+export interface AccessTokenPayload {
+  sub: string;
+  email: string;
+  jti: string;
+  type: 'access';
+  exp: number;
+}
+
+export interface RefreshTokenPayload {
+  sub: string;
+  jti: string;
+  type: 'refresh';
+}
+
+export interface AuthenticatedRequestUser {
+  id: string;
+  email: string;
+  jti: string;
+  tokenExp: number;
+}

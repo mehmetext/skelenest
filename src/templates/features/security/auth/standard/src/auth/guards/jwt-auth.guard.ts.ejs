@@ -1,0 +1,50 @@
+<%_ const includesRedis = selectedOptionIds.includes('redis'); _%>
+<%_ if (!includesRedis) { _%>
+import { PrismaService } from "src/prisma/prisma.service";
+<%_ } _%>
+import { ExecutionContext, Injectable<%_ if (includesRedis) { _%>, UnauthorizedException<%_ } _%> } from "@nestjs/common";
+import { AuthGuard } from "@nestjs/passport";
+import type { Request } from "express";
+<%_ if (includesRedis) { _%>
+import { InjectRedis } from "@nestjs-modules/ioredis";
+import { Redis } from "ioredis";
+import { BLOCKLIST_KEY } from "../auth.constants";
+<%_ } _%>
+import type { AuthenticatedRequestUser } from "../types";
+
+@Injectable()
+export class JwtAuthGuard extends AuthGuard("jwt") {
+<%_ if (includesRedis) { _%>
+  constructor(@InjectRedis() private readonly redis: Redis) {
+    super();
+  }
+<%_ } else { _%>
+  constructor(private readonly prisma: PrismaService) {
+    super();
+  }
+<%_ } _%>
+
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const result = await (super.canActivate(context) as Promise<boolean>);
+    if (!result) return false;
+
+<%_ if (includesRedis) { _%>
+    const request = context.switchToHttp().getRequest<Request>();
+    const user = request.user as AuthenticatedRequestUser;
+    const blocked = await this.redis.exists(BLOCKLIST_KEY(user.jti));
+    if (blocked) throw new UnauthorizedException("Token has been revoked");
+<%_ } else { _%>
+    const request = context.switchToHttp().getRequest<Request>();
+    const user = request.user as AuthenticatedRequestUser;
+    const blocked = await this.prisma.revokedAccessToken.findUnique({
+      where: { jti: user.jti },
+      select: { expiresAt: true },
+    });
+    if (blocked && blocked.expiresAt.getTime() > Date.now()) {
+      throw new UnauthorizedException("Token has been revoked");
+    }
+<%_ } _%>
+
+    return true;
+  }
+}

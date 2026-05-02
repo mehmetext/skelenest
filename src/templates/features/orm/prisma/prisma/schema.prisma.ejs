@@ -7,3 +7,11 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+<%
+const prismaSchemaModels = getSlot('prisma.schema.models');
+-%>
+<%_ if (prismaSchemaModels.length > 0) { _%>
+
+<%- prismaSchemaModels.join('\n\n') %>
+<%_ } _%>

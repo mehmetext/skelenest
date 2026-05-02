@@ -1,0 +1,18 @@
+import type { RefreshTokenPayload } from '../../types';
+
+export interface IssuedAuthTokens {
+  accessToken: string;
+  refreshToken: string;
+  refreshTokenJti: string;
+  refreshTokenTtlSeconds: number;
+}
+
+export interface AuthTokenService {
+  issueTokens(input: {
+    userId: string;
+    email: string;
+  }): Promise<IssuedAuthTokens>;
+  verifyRefreshToken(refreshToken: string): Promise<RefreshTokenPayload>;
+}
+
+export const AUTH_TOKEN_SERVICE = Symbol('AUTH_TOKEN_SERVICE');
