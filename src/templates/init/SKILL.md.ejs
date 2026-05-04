@@ -14,7 +14,7 @@ Use this skill when working inside this generated NestJS project. Keep changes a
 - ORM: `<%= selectionSummary.orm ?? 'None' %>`
 - Features: <%= selectionSummary.features.length > 0 ? selectionSummary.features.join(', ') : 'None' %>
 - Starter modules: <%= selectionSummary.modules.length > 0 ? selectionSummary.modules.join(', ') : 'None' %>
-- Package manager: `<%= pmRunCommandPrefix %>`
+- Package manager: `<%= packageManagerName %>` (`<%= packageManagerField %>`)
 
 ## Working Rules
 
@@ -23,58 +23,130 @@ Use this skill when working inside this generated NestJS project. Keep changes a
 3. Prefer focused, incremental edits over broad rewrites.
 4. After code changes, run the smallest relevant verification first, then broader checks when the change crosses module boundaries.
 5. Do not add a new ORM, cache, queue, auth strategy, or documentation system unless the user asks for that technology.
+6. Treat `.skelenest/project.json`, this skill, and `package.json` as the source of truth for selected-stack decisions.
 
 ## Architecture Guidance
 
 <%_ if (selections.architecture === 'standard') { _%>
-This project uses the standard NestJS module style. Place feature code close together under `src/<feature>`, keep controllers thin, keep business logic in services, and wire providers in each feature module.
+This project uses the standard NestJS module style.
+
+- Place feature code under `src/<feature>`.
+- Keep controllers thin: parse transport inputs, call services, return DTO-shaped outputs.
+- Put business behavior in services and keep persistence details behind clear private methods or repository classes when complexity grows.
+- Keep DTOs under `src/<feature>/dto` and tests near the code they cover.
+- Wire controllers, services, guards, and providers in the owning feature module. Do not create cross-feature imports unless there is a real dependency.
 <%_ } else if (selections.architecture === 'clean') { _%>
-This project uses Clean Architecture. Keep presentation concerns under `presentation`, application behavior under `application`, infrastructure adapters under `infrastructure`, and depend on ports rather than concrete adapters across boundaries.
+This project uses Clean Architecture.
+
+- Keep presentation concerns under `presentation`, application behavior under `application`, and adapters under `infrastructure`.
+- Application services and use cases may depend on ports, DTOs, and domain/application types; they must not import Prisma, TypeORM, Sequelize, Redis, HTTP decorators, or Nest request objects.
+- Infrastructure adapters implement application ports and translate ORM/cache/queue records into application-facing objects.
+- Presentation code owns controllers, guards, strategies, pipes, and request/response DTO mapping.
+- Register port tokens and their concrete adapters in the module file closest to the feature.
 <%_ } else if (selections.architecture === 'ddd') { _%>
-This project uses DDD plus Clean Architecture. Keep domain rules in `domain`, use cases and ports in `application`, adapters in `infrastructure`, and HTTP concerns in `presentation`. Avoid leaking framework or persistence details into domain code.
+This project uses DDD plus Clean Architecture.
+
+- Use `src/modules/<bounded-context>` as the default feature boundary.
+- Keep entities, value objects, domain services, domain events, and invariants in `domain`.
+- Keep use cases, application services, ports, and application DTOs in `application`.
+- Keep persistence, cache, queue, mail, token, and external-service adapters in `infrastructure`.
+- Keep controllers, guards, strategies, decorators, and HTTP DTOs in `presentation`.
+- Domain code must be framework-agnostic: no Nest decorators, ORM models, Prisma types, HTTP types, or environment access.
+- Repositories should persist aggregate roots and expose intention-revealing methods such as `findByEmail`, `save`, `existsBySlug`, and `softDelete`.
+- Do not split every small function into a use case. Add use cases when there is a user/business action, transaction boundary, authorization decision, or orchestration.
 <%_ } _%>
 
 ## Persistence Rules
 
 <%_ if (selections.orm === 'prisma') { _%>
-- Prisma is the selected ORM. Use `PrismaService` and the generated Prisma client types.
-- Keep Prisma schema changes in `prisma/schema.prisma`.
-- Use `prisma:generate` after schema changes and a migration command when persistence shape changes.
+Prisma is the selected ORM.
+
+- Use `PrismaService` and generated Prisma client types only in infrastructure/persistence code or standard-feature services that already own persistence.
+- Keep schema changes in `prisma/schema.prisma`; run generate after every schema edit and create a migration when the persisted shape changes.
+- Use camelCase field names in TypeScript and map database column names to snake_case with `@map`, for example `createdAt DateTime @default(now()) @map("created_at")`.
+- Add audit fields to new persisted models unless there is a strong reason not to:
+  - `createdAt DateTime @default(now()) @map("created_at")`
+  - `updatedAt DateTime @updatedAt @map("updated_at")`
+  - `deletedAt DateTime? @map("deleted_at")`
+- Add `@@map("<snake_case_plural_table>")` to models unless the existing schema uses another convention.
+- Prefer soft delete for user/business-owned records: set `deletedAt` instead of deleting rows, filter reads with `deletedAt: null`, and keep restore/hard-delete behavior explicit.
+- Keep unique indexes compatible with soft delete. When a value must be reusable after deletion, use a composite uniqueness strategy or an explicit database migration/index rather than a naive `@unique` that blocks recreation.
+- Do not use Prisma models as domain entities in Clean/DDD code. Map records at the repository boundary.
+- Use transactions for multi-write invariants and pass the transaction client through private helpers instead of opening nested transactions.
+- Select only fields needed by the caller for read paths that can grow large; avoid broad `include` trees by default.
 - Do not add TypeORM or Sequelize code.
 <%_ } else if (selections.orm === 'typeorm') { _%>
-- TypeORM is the selected ORM. Use `TypeOrmModule` and entities under `src/database/entities`.
+TypeORM is the selected ORM.
+
+- Use `TypeOrmModule`, repositories, and entities under `src/database/entities` or the architecture-specific infrastructure folder.
+- Keep database column names snake_case with explicit `name` options, for example `@CreateDateColumn({ name: 'created_at' })`.
+- Add `createdAt`, `updatedAt`, and `deletedAt` to new persistent entities unless the table is intentionally immutable.
+- Prefer `softDelete`/`softRemove` and queries that exclude deleted rows by default.
+- Keep entity decorators out of DDD domain entities; map between persistence entities and domain/application models at adapters.
+- Use migrations for schema changes; do not rely on `synchronize` outside throwaway local development.
 - Do not add Prisma or Sequelize code.
 <%_ } else if (selections.orm === 'sequelize') { _%>
-- Sequelize is the selected ORM. Use `SequelizeModule` and models under `src/database/models`.
+Sequelize is the selected ORM.
+
+- Use `SequelizeModule` and `sequelize-typescript` models under `src/database/models` or the architecture-specific infrastructure folder.
+- Keep table and column names explicit with snake_case names.
+- Enable timestamps for normal business models and map them to `created_at` and `updated_at`.
+- Use paranoid models for soft delete when records should be recoverable or auditable.
+- Keep Sequelize models out of DDD domain code; map at infrastructure boundaries.
 - Do not add Prisma or TypeORM code.
 <%_ } else { _%>
 - No ORM was selected. Do not add database clients, migrations, repositories, or `DATABASE_URL` unless the user asks to introduce persistence.
+<%_ } _%>
+
+## Package Manager Rules
+
+- Use `<%= packageManagerName %>` for installs and scripts in this repository.
+- Install dependencies with `<%= pmInstallCommand %>`.
+- Run scripts with `<%= pmRunCommandPrefix %> script-name`.
+- Keep the `packageManager` field as `<%= packageManagerField %>` unless deliberately upgrading the toolchain.
+<%_ if (packageManagerName === 'npm') { _%>
+- For one-off package binaries, prefer `npx` or `npm exec` according to the package's documented usage.
+<%_ } else if (packageManagerName === 'pnpm') { _%>
+- For one-off package binaries, prefer `pnpm dlx` or `pnpm exec`; do not introduce npm/yarn lockfiles.
+<%_ } else if (packageManagerName === 'yarn') { _%>
+- This project uses Yarn Classic. Prefer `yarn run script-name` and `yarn add`; do not introduce npm/pnpm lockfiles.
 <%_ } _%>
 
 ## Feature Rules
 
 <%_ if (selectedOptionIds.includes('redis')) { _%>
 - Redis is selected. Use the existing Redis module wiring and `REDIS_URL` configuration.
+- Reuse shared Redis clients/providers; do not create ad hoc clients in feature code.
+- Put cache/session key naming behind small helpers or constants, include a feature prefix, and always set TTLs for ephemeral data.
 <%_ } else { _%>
 - Redis is not selected. Do not add Redis dependencies, `REDIS_URL`, Redis modules, Redis auth sessions, or Redis-backed throttling.
 <%_ } _%>
 <%_ if (selectedOptionIds.includes('bullmq')) { _%>
 - BullMQ is selected. Queue code may use BullMQ and the Redis connection already configured by this scaffold.
+- Keep queue names, job names, and retry/backoff defaults centralized near the queue module.
+- Make processors idempotent; jobs can be retried or delivered after partial work.
+- Keep job payloads small, serializable, and version-tolerant. Store large state in the database and pass identifiers through the queue.
 <%_ } else { _%>
 - BullMQ is not selected. Do not add queue processors, BullMQ dependencies, or queue-specific runtime config.
 <%_ } _%>
 <%_ if (selectedOptionIds.includes('throttler')) { _%>
 - Throttler is selected. Keep rate limiting centralized in `AppModule` unless a feature-specific override is explicitly needed.
+- Add route-specific throttles only for endpoints with different abuse profiles, such as login, token refresh, or expensive search.
+- If Redis is selected, prefer Redis-backed throttling for multi-instance deployments.
 <%_ } else { _%>
 - Throttler is not selected. Do not add rate limiting modules or guards unless requested.
 <%_ } _%>
 <%_ if (selectedOptionIds.includes('swagger')) { _%>
 - Swagger is selected. Keep DTO and controller decorators consistent with existing OpenAPI usage.
+- Document request DTOs, response DTOs, auth requirements, path/query params, and error cases when adding or changing public endpoints.
+- Keep OpenAPI decorators in presentation/controller DTO code, not in domain or application layers.
 <%_ } else { _%>
 - Swagger is not selected. Do not add `@nestjs/swagger` imports or decorators.
 <%_ } _%>
 <%_ if (selectedOptionIds.includes('docker')) { _%>
 - Docker is selected. Keep runtime service changes reflected in `Dockerfile` and `docker-compose.yml`.
+- If a new runtime dependency is added, add the service, health/env wiring, and local connection defaults together.
+- Keep container hostnames aligned with `.env` values, for example `postgres` or `redis` inside compose and `localhost` outside compose.
 <%_ } else { _%>
 - Docker is not selected. Do not add Docker files or Docker-only environment assumptions unless requested.
 <%_ } _%>
@@ -89,9 +161,22 @@ This project uses DDD plus Clean Architecture. Keep domain rules in `domain`, us
 - Auth sessions and access-token blocklisting use Prisma models. Do not add Redis auth session code.
 <%_ } _%>
 - Keep password hashing, token creation, guards, strategies, and DTOs in the generated auth module structure for the selected architecture.
+- Never return password hashes, refresh-token hashes, token identifiers, or session internals from controllers.
+- Hash secrets before persistence and compare with constant-time or library-provided verification.
+- Keep access-token lifetime, refresh-token lifetime, issuer/audience, and password policy in configuration or dedicated constants.
+- Treat refresh-token rotation and logout as state-changing operations that must invalidate the previous session/token record.
+- Add tests around login/register/refresh/logout behavior when auth logic changes.
 <%_ } else { _%>
 - Auth starter module is not selected. Do not add auth guards, JWT modules, passport strategies, user session storage, or auth DTOs unless requested.
 <%_ } _%>
+
+## Module And Generation Rules
+
+- Match generated artifacts to the selected architecture. Standard modules live under `src/<feature>`; Clean/DDD modules live under `src/modules/<feature>`.
+- When adding a new model/resource, update the ORM schema/entity/model, repository or service, DTOs, module wiring, and tests together.
+- In Clean/DDD projects, create application ports before infrastructure adapters when the use case needs persistence, cache, queues, or external services.
+- Keep cross-module calls explicit through exported providers or application services. Avoid importing another module's private infrastructure adapter.
+- Prefer stable public DTOs over returning ORM records from controllers.
 
 ## Commands
 

@@ -124,6 +124,8 @@ export function createInitBlueprint(
       pmRunCommandPrefix: selectedPackageManager.pmRunCommand,
       pmGlobalInstallCommandPrefix:
         selectedPackageManager.pmGlobalInstallCommand,
+      packageManagerName: selectedPackageManager.name,
+      packageManagerField: selectedPackageManager.packageManagerField,
       selectedOptionIds: selectionState.selectedOptionIds,
     },
   };
