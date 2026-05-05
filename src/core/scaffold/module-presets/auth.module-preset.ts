@@ -29,7 +29,7 @@ export const authModulePreset: ModulePresetDefinition<InitPromptData> = {
   id: "auth",
   label: "Auth Starter Module",
   supportedArchitectures: ["standard", "clean", "ddd"],
-  supportedOrms: ["prisma"],
+  supportedOrms: ["prisma", "sequelize"],
   resolveContribution(input) {
     const { architecture } = input;
     const includesRedis = input.context.has("redis");
@@ -87,6 +87,23 @@ export const authModulePreset: ModulePresetDefinition<InitPromptData> = {
   @@map("revoked_access_tokens")
 }`,
               ]
+            : []),
+        ],
+        "sequelize.models.imports": [
+          ...((usersContribution.slots?.["sequelize.models.imports"] as string[]) ??
+            []),
+          ...(!includesRedis
+            ? [
+                `import { RefreshSessionModel } from './models/refresh-session.model';`,
+                `import { RevokedAccessTokenModel } from './models/revoked-access-token.model';`,
+              ]
+            : []),
+        ],
+        "sequelize.models.entries": [
+          ...((usersContribution.slots?.["sequelize.models.entries"] as string[]) ??
+            []),
+          ...(!includesRedis
+            ? ["RefreshSessionModel", "RevokedAccessTokenModel"]
             : []),
         ],
       },

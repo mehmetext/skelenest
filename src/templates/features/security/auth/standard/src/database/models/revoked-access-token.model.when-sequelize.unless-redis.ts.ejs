@@ -1,0 +1,47 @@
+import type {
+  CreationOptional,
+  InferAttributes,
+  InferCreationAttributes,
+} from "sequelize";
+import {
+  Column,
+  CreatedAt,
+  DataType,
+  Model,
+  PrimaryKey,
+  Table,
+} from "sequelize-typescript";
+
+@Table({
+  tableName: "revoked_access_tokens",
+  underscored: true,
+  updatedAt: false,
+})
+export class RevokedAccessTokenModel extends Model<
+  InferAttributes<RevokedAccessTokenModel>,
+  InferCreationAttributes<RevokedAccessTokenModel>
+> {
+  @PrimaryKey
+  @Column({
+    defaultValue: DataType.UUIDV4,
+    type: DataType.UUID,
+  })
+  declare id: CreationOptional<string>;
+
+  @Column({
+    allowNull: false,
+    type: DataType.STRING,
+    unique: true,
+  })
+  declare jti: string;
+
+  @Column({
+    allowNull: false,
+    field: "expires_at",
+    type: DataType.DATE,
+  })
+  declare expiresAt: Date;
+
+  @CreatedAt
+  declare createdAt: CreationOptional<Date>;
+}

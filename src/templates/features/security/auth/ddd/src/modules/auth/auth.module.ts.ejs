@@ -1,7 +1,14 @@
+<%_ const includesRedis = selectedOptionIds.includes('redis'); _%>
+<%_ const isSequelize = selectedOptionIds.includes('sequelize'); _%>
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
+<%_ if (isSequelize && !includesRedis) { _%>
+import { SequelizeModule } from '@nestjs/sequelize';
+import { RefreshSessionModel } from '../../database/models/refresh-session.model';
+import { RevokedAccessTokenModel } from '../../database/models/revoked-access-token.model';
+<%_ } _%>
 import { UsersModule } from '../users/users.module';
 import { AUTH_SESSION_STORE } from './application/ports/auth-session-store.port';
 import { AUTH_TOKEN_SERVICE } from './application/ports/auth-token-service.port';
@@ -15,10 +22,13 @@ import { ValidateUserUseCase } from './application/use-cases/validate-user.use-c
 import { AuthTokenOrchestratorService } from './application/services/auth-token-orchestrator.service';
 import { AuthUserMapperService } from './application/services/auth-user-mapper.service';
 import { PasswordPolicyService } from './domain/services/password-policy.service';
-<%_ if (!selectedOptionIds.includes('redis')) { _%>
+<%_ if (!includesRedis && !isSequelize) { _%>
 import { PrismaAuthSessionStoreAdapter } from './infrastructure/cache/prisma-auth-session-store.adapter';
 <%_ } _%>
-<%_ if (selectedOptionIds.includes('redis')) { _%>
+<%_ if (!includesRedis && isSequelize) { _%>
+import { SequelizeAuthSessionStoreAdapter } from './infrastructure/cache/sequelize-auth-session-store.adapter';
+<%_ } _%>
+<%_ if (includesRedis) { _%>
 import { RedisAuthSessionStoreAdapter } from './infrastructure/cache/redis-auth-session-store.adapter';
 <%_ } _%>
 import { JwtAuthTokenAdapter } from './infrastructure/security/jwt-auth-token.adapter';
@@ -34,6 +44,9 @@ import { LocalStrategy } from './presentation/http/strategies/local.strategy';
     ConfigModule,
     PassportModule,
     UsersModule,
+<%_ if (isSequelize && !includesRedis) { _%>
+    SequelizeModule.forFeature([RefreshSessionModel, RevokedAccessTokenModel]),
+<%_ } _%>
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -67,8 +80,10 @@ import { LocalStrategy } from './presentation/http/strategies/local.strategy';
     },
     {
       provide: AUTH_SESSION_STORE,
-<%_ if (selectedOptionIds.includes('redis')) { _%>
+<%_ if (includesRedis) { _%>
       useClass: RedisAuthSessionStoreAdapter,
+<%_ } else if (isSequelize) { _%>
+      useClass: SequelizeAuthSessionStoreAdapter,
 <%_ } else { _%>
       useClass: PrismaAuthSessionStoreAdapter,
 <%_ } _%>

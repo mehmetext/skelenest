@@ -1,0 +1,35 @@
+import { Injectable } from "@nestjs/common";
+import { InjectModel } from "@nestjs/sequelize";
+import { UserModel } from "../database/models/user.model";
+
+export interface CreateUserInput {
+  email: string;
+  passwordHash: string;
+  firstName?: string | null;
+  lastName?: string | null;
+}
+
+@Injectable()
+export class UsersService {
+  constructor(
+    @InjectModel(UserModel)
+    private readonly users: typeof UserModel
+  ) {}
+
+  findById(id: string): Promise<UserModel | null> {
+    return this.users.findByPk(id);
+  }
+
+  findByEmail(email: string): Promise<UserModel | null> {
+    return this.users.findOne({ where: { email } });
+  }
+
+  createUser(input: CreateUserInput): Promise<UserModel> {
+    return this.users.create({
+      email: input.email,
+      passwordHash: input.passwordHash,
+      firstName: input.firstName ?? null,
+      lastName: input.lastName ?? null,
+    });
+  }
+}

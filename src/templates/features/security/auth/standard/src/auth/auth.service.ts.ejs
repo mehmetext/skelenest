@@ -1,7 +1,19 @@
 <%_ const includesRedis = selectedOptionIds.includes('redis'); _%>
-import type { User } from "src/generated/prisma/client";
+<%_ const isSequelize = selectedOptionIds.includes('sequelize'); _%>
+<%_ if (isSequelize) { _%>
+import type { UserModel } from "../database/models/user.model";
 <%_ if (!includesRedis) { _%>
+import { InjectModel } from "@nestjs/sequelize";
+import { RefreshSessionModel } from "../database/models/refresh-session.model";
+import { RevokedAccessTokenModel } from "../database/models/revoked-access-token.model";
+<%_ } _%>
+<%_ } else { _%>
+import type { User } from "src/generated/prisma/client";
+<%_ } _%>
+<%_ if (!includesRedis) { _%>
+<%_ if (!isSequelize) { _%>
 import { PrismaService } from "src/prisma/prisma.service";
+<%_ } _%>
 <%_ } _%>
 import { CreateUserInput, UsersService } from "../users/users.service";
 <%_ if (includesRedis) { _%>
@@ -69,7 +81,14 @@ export class AuthService {
 
   constructor(
 <%_ if (!includesRedis) { _%>
+<%_ if (isSequelize) { _%>
+    @InjectModel(RefreshSessionModel)
+    private readonly refreshSessions: typeof RefreshSessionModel,
+    @InjectModel(RevokedAccessTokenModel)
+    private readonly revokedAccessTokens: typeof RevokedAccessTokenModel,
+<%_ } else { _%>
     private readonly prisma: PrismaService,
+<%_ } _%>
 <%_ } _%>
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
@@ -153,7 +172,9 @@ export class AuthService {
     await this.redis.del(key);
     const tokens = await this.issueTokens(user);
 <%_ } else { _%>
-    const session = await this.prisma.refreshSession.findUnique({
+    const session = await <% if (isSequelize) { %>this.refreshSessions.findOne({
+      where: { tokenHash: this.hashToken(refreshToken) },
+    })<% } else { %>this.prisma.refreshSession.findUnique({
       where: {
         tokenHash: this.hashToken(refreshToken),
       },
@@ -163,7 +184,7 @@ export class AuthService {
         revokedAt: true,
         expiresAt: true,
       },
-    });
+    })<% } %>;
     if (!session || session.revokedAt || session.expiresAt.getTime() <= Date.now()) {
       throw new UnauthorizedException("Invalid refresh token");
     }
@@ -174,7 +195,15 @@ export class AuthService {
     const user = await this.usersService.findById(session.userId);
     if (!user) throw new UnauthorizedException("Invalid refresh token");
 
-    await this.prisma.refreshSession.updateMany({
+    await <% if (isSequelize) { %>this.refreshSessions.update(
+      { revokedAt: new Date() },
+      {
+        where: {
+          tokenHash: this.hashToken(refreshToken),
+          revokedAt: null,
+        },
+      },
+    )<% } else { %>this.prisma.refreshSession.updateMany({
       where: {
         tokenHash: this.hashToken(refreshToken),
         revokedAt: null,
@@ -182,7 +211,7 @@ export class AuthService {
       data: {
         revokedAt: new Date(),
       },
-    });
+    })<% } %>;
     const tokens = await this.issueTokens(user);
 <%_ } _%>
 
@@ -213,7 +242,15 @@ export class AuthService {
     const ttl = Math.max(0, accessTokenExp - Math.floor(Date.now() / 1000));
 
     await Promise.all([
-      this.prisma.refreshSession.updateMany({
+      <% if (isSequelize) { %>this.refreshSessions.update(
+        { revokedAt: new Date() },
+        {
+          where: {
+            tokenHash: this.hashToken(refreshToken),
+            revokedAt: null,
+          },
+        },
+      )<% } else { %>this.prisma.refreshSession.updateMany({
         where: {
           tokenHash: this.hashToken(refreshToken),
           revokedAt: null,
@@ -221,9 +258,12 @@ export class AuthService {
         data: {
           revokedAt: new Date(),
         },
-      }),
+      })<% } %>,
       ttl > 0
-        ? this.prisma.revokedAccessToken.upsert({
+        ? <% if (isSequelize) { %>this.revokedAccessTokens.upsert({
+            jti: accessTokenJti,
+            expiresAt: new Date(Date.now() + ttl * 1000),
+          })<% } else { %>this.prisma.revokedAccessToken.upsert({
             where: { jti: accessTokenJti },
             update: {
               expiresAt: new Date(Date.now() + ttl * 1000),
@@ -232,7 +272,7 @@ export class AuthService {
               jti: accessTokenJti,
               expiresAt: new Date(Date.now() + ttl * 1000),
             },
-          })
+          })<% } %>
         : Promise.resolve(),
       Promise.resolve(userId),
     ]);
@@ -261,7 +301,7 @@ export class AuthService {
     return authUser;
   }
 
-  private async issueTokens(user: User): Promise<AuthTokensDto> {
+  private async issueTokens(user: <%_ if (isSequelize) { _%>UserModel<%_ } else { _%>User<%_ } _%>): Promise<AuthTokensDto> {
     const accessPayload: Omit<AccessTokenPayload, "exp"> = {
       sub: user.id,
       email: user.email,
@@ -293,7 +333,13 @@ export class AuthService {
       this.refreshTtlSeconds
     );
 <%_ } else { _%>
-    await this.prisma.refreshSession.upsert({
+    await <% if (isSequelize) { %>this.refreshSessions.upsert({
+      tokenHash: this.hashToken(refreshToken),
+      jti: refreshPayload.jti,
+      userId: user.id,
+      expiresAt: new Date(Date.now() + this.refreshTtlSeconds * 1000),
+      revokedAt: null,
+    })<% } else { %>this.prisma.refreshSession.upsert({
       where: {
         tokenHash: this.hashToken(refreshToken),
       },
@@ -309,7 +355,7 @@ export class AuthService {
         userId: user.id,
         expiresAt: new Date(Date.now() + this.refreshTtlSeconds * 1000),
       },
-    });
+    })<% } %>;
 <%_ } _%>
 
     return { accessToken, refreshToken };
@@ -391,7 +437,7 @@ export class AuthService {
     return randomBytes(TOKEN_ID_BYTES).toString("hex");
   }
 
-  private toAuthResponse(user: User, tokens: AuthTokensDto): AuthResponseDto {
+  private toAuthResponse(user: <%_ if (isSequelize) { _%>UserModel<%_ } else { _%>User<%_ } _%>, tokens: AuthTokensDto): AuthResponseDto {
     return {
       user: this.toAuthUser(user),
       accessToken: tokens.accessToken,
@@ -399,7 +445,7 @@ export class AuthService {
     };
   }
 
-  private toAuthUser(user: User): AuthUserDto {
+  private toAuthUser(user: <%_ if (isSequelize) { _%>UserModel<%_ } else { _%>User<%_ } _%>): AuthUserDto {
     return {
       id: user.id,
       email: user.email,

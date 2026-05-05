@@ -97,7 +97,12 @@ export class ${names.entityClassName} {
 }
 
 function buildSequelizeModelFile(names: ResourceNames): string {
-  return `import {
+  return `import type {
+  CreationOptional,
+  InferAttributes,
+  InferCreationAttributes,
+} from 'sequelize';
+import {
   Column,
   CreatedAt,
   DataType,
@@ -109,13 +114,16 @@ function buildSequelizeModelFile(names: ResourceNames): string {
 } from 'sequelize-typescript';
 
 @Table({ tableName: '${names.routeSegment}' })
-export class ${names.modelClassName} extends Model<${names.modelClassName}> {
+export class ${names.modelClassName} extends Model<
+  InferAttributes<${names.modelClassName}>,
+  InferCreationAttributes<${names.modelClassName}>
+> {
   @PrimaryKey
   @Column({
     autoIncrement: true,
     type: DataType.INTEGER,
   })
-  declare id: number;
+  declare id: CreationOptional<number>;
 
   @Column({
     allowNull: false,
@@ -134,13 +142,13 @@ export class ${names.modelClassName} extends Model<${names.modelClassName}> {
     allowNull: false,
     type: DataType.BOOLEAN,
   })
-  declare isActive: boolean;
+  declare isActive: CreationOptional<boolean>;
 
   @CreatedAt
-  declare createdAt: Date;
+  declare createdAt: CreationOptional<Date>;
 
   @UpdatedAt
-  declare updatedAt: Date;
+  declare updatedAt: CreationOptional<Date>;
 }
 `;
 }

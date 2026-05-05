@@ -69,6 +69,9 @@ async function verifyDoctorJsonOutput() {
 
 async function verifyGenerateCommands() {
   const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), "skelenest-generate-"));
+  const sequelizeProjectDir = fs.mkdtempSync(
+    path.join(os.tmpdir(), "skelenest-generate-sequelize-")
+  );
 
   try {
     const blueprint = createInitBlueprint({
@@ -127,8 +130,46 @@ async function verifyGenerateCommands() {
       moduleFile.includes("SyncProductsUseCase"),
       "use-case generation should register the provider in the module file"
     );
+
+    const sequelizeBlueprint = createInitBlueprint({
+      name: "sequelize-generate-app",
+      port: "3000",
+      packageManager: "pnpm",
+      installDependencies: false,
+      initializeGit: false,
+      selections: {
+        orm: "sequelize",
+        architecture: "standard",
+        features: [],
+        modules: [],
+      },
+    });
+
+    await copyTemplateTree({
+      templateRoots: sequelizeBlueprint.templateRoots,
+      outputRoot: sequelizeProjectDir,
+      data: sequelizeBlueprint.templateData,
+      slots: sequelizeBlueprint.slots,
+    });
+
+    runCli(sequelizeProjectDir, ["generate", "resource", "orders"]);
+
+    const sequelizeModelFile = fs.readFileSync(
+      path.join(sequelizeProjectDir, "src", "database", "models", "order.model.ts"),
+      "utf8"
+    );
+
+    ensure(
+      sequelizeModelFile.includes("InferCreationAttributes<OrderModel>"),
+      "sequelize resource models should infer creation attributes for Model.create"
+    );
+    ensure(
+      sequelizeModelFile.includes("declare id: CreationOptional<number>"),
+      "sequelize resource primary keys should be optional on create"
+    );
   } finally {
     fs.rmSync(projectDir, { recursive: true, force: true });
+    fs.rmSync(sequelizeProjectDir, { recursive: true, force: true });
   }
 }
 

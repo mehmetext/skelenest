@@ -1,0 +1,16 @@
+import type { UserModel } from '../../../../database/models/user.model';
+
+export interface CreateUserInput {
+  email: string;
+  passwordHash: string;
+  firstName?: string | null;
+  lastName?: string | null;
+}
+
+export interface UsersRepository {
+  findById(id: string): Promise<UserModel | null>;
+  findByEmail(email: string): Promise<UserModel | null>;
+  create(input: CreateUserInput): Promise<UserModel>;
+}
+
+export const USERS_REPOSITORY = Symbol('USERS_REPOSITORY');

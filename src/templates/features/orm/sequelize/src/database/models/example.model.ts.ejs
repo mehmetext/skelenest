@@ -7,15 +7,23 @@ import {
   Table,
   UpdatedAt,
 } from "sequelize-typescript";
+import type {
+  CreationOptional,
+  InferAttributes,
+  InferCreationAttributes,
+} from "sequelize";
 
 @Table({ tableName: "examples" })
-export class ExampleModel extends Model<ExampleModel> {
+export class ExampleModel extends Model<
+  InferAttributes<ExampleModel>,
+  InferCreationAttributes<ExampleModel>
+> {
   @PrimaryKey
   @Column({
     autoIncrement: true,
     type: DataType.INTEGER,
   })
-  declare id: number;
+  declare id: CreationOptional<number>;
 
   @Column({
     allowNull: false,
@@ -25,8 +33,8 @@ export class ExampleModel extends Model<ExampleModel> {
   declare name: string;
 
   @CreatedAt
-  declare createdAt: Date;
+  declare createdAt: CreationOptional<Date>;
 
   @UpdatedAt
-  declare updatedAt: Date;
+  declare updatedAt: CreationOptional<Date>;
 }

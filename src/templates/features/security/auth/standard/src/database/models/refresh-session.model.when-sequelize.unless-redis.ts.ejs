@@ -1,0 +1,74 @@
+import type {
+  CreationOptional,
+  InferAttributes,
+  InferCreationAttributes,
+} from "sequelize";
+import {
+  Column,
+  CreatedAt,
+  DataType,
+  ForeignKey,
+  Model,
+  PrimaryKey,
+  Table,
+  UpdatedAt,
+} from "sequelize-typescript";
+import { UserModel } from "./user.model";
+
+@Table({
+  tableName: "refresh_sessions",
+  underscored: true,
+})
+export class RefreshSessionModel extends Model<
+  InferAttributes<RefreshSessionModel>,
+  InferCreationAttributes<RefreshSessionModel>
+> {
+  @PrimaryKey
+  @Column({
+    defaultValue: DataType.UUIDV4,
+    type: DataType.UUID,
+  })
+  declare id: CreationOptional<string>;
+
+  @Column({
+    allowNull: false,
+    field: "token_hash",
+    type: DataType.STRING,
+    unique: true,
+  })
+  declare tokenHash: string;
+
+  @Column({
+    allowNull: false,
+    type: DataType.STRING,
+  })
+  declare jti: string;
+
+  @ForeignKey(() => UserModel)
+  @Column({
+    allowNull: false,
+    field: "user_id",
+    type: DataType.UUID,
+  })
+  declare userId: string;
+
+  @Column({
+    allowNull: false,
+    field: "expires_at",
+    type: DataType.DATE,
+  })
+  declare expiresAt: Date;
+
+  @Column({
+    allowNull: true,
+    field: "revoked_at",
+    type: DataType.DATE,
+  })
+  declare revokedAt: Date | null;
+
+  @CreatedAt
+  declare createdAt: CreationOptional<Date>;
+
+  @UpdatedAt
+  declare updatedAt: CreationOptional<Date>;
+}

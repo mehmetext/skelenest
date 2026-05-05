@@ -1,11 +1,15 @@
+<%_ if (selectedOptionIds.includes('sequelize')) { _%>
+import type { UserModel } from '../../../../database/models/user.model';
+<%_ } else { _%>
 import type { User } from 'src/generated/prisma/client';
+<%_ } _%>
 import { Injectable } from '@nestjs/common';
 import type { AuthResponseDto, AuthUserDto } from '../dto/auth.dto';
 
 @Injectable()
 export class AuthUserMapperService {
   toAuthResponse(
-    user: User,
+    user: <%_ if (selectedOptionIds.includes('sequelize')) { _%>UserModel<%_ } else { _%>User<%_ } _%>,
     tokens: { accessToken: string; refreshToken: string },
   ): AuthResponseDto {
     return {
@@ -15,7 +19,7 @@ export class AuthUserMapperService {
     };
   }
 
-  toAuthUser(user: User): AuthUserDto {
+  toAuthUser(user: <%_ if (selectedOptionIds.includes('sequelize')) { _%>UserModel<%_ } else { _%>User<%_ } _%>): AuthUserDto {
     return {
       id: user.id,
       email: user.email,

@@ -1,10 +1,17 @@
 import { SequelizeModuleOptions } from "@nestjs/sequelize";
 import { ExampleModel } from "./models/example.model";
+<%
+const sequelizeModelImports = getSlot('sequelize.models.imports');
+const sequelizeModelEntries = getSlot('sequelize.models.entries');
+-%>
+<%_ if (sequelizeModelImports.length > 0) { _%>
+<%- sequelizeModelImports.join('\n') %>
+<%_ } _%>
 
 export const sequelizeConfig: SequelizeModuleOptions = {
   dialect: "postgres",
   uri: process.env.DATABASE_URL,
   autoLoadModels: true,
   synchronize: process.env.NODE_ENV !== "production",
-  models: [ExampleModel],
+  models: [ExampleModel<%_ if (sequelizeModelEntries.length > 0) { _%>, <%- sequelizeModelEntries.join(", ") %><%_ } _%>],
 };

@@ -1,4 +1,8 @@
+<%_ if (selectedOptionIds.includes('sequelize')) { _%>
+import type { UserModel } from '../../../../database/models/user.model';
+<%_ } else { _%>
 import type { User } from 'src/generated/prisma/client';
+<%_ } _%>
 import { Inject, Injectable } from '@nestjs/common';
 import { AUTH_SESSION_STORE } from '../ports/auth-session-store.port';
 import type { AuthSessionStore } from '../ports/auth-session-store.port';
@@ -14,7 +18,7 @@ export class AuthTokenOrchestratorService {
     private readonly authSessionStore: AuthSessionStore,
   ) {}
 
-  async issueForUser(user: User) {
+  async issueForUser(user: <%_ if (selectedOptionIds.includes('sequelize')) { _%>UserModel<%_ } else { _%>User<%_ } _%>) {
     const tokens = await this.authTokenService.issueTokens({
       userId: user.id,
       email: user.email,

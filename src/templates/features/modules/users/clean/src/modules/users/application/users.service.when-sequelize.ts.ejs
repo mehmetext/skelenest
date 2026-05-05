@@ -1,0 +1,27 @@
+import { Inject, Injectable } from '@nestjs/common';
+import type { UserModel } from '../../../database/models/user.model';
+import { USERS_REPOSITORY } from './ports/users-repository.port';
+import type {
+  CreateUserInput,
+  UsersRepository,
+} from './ports/users-repository.port';
+
+@Injectable()
+export class UsersService {
+  constructor(
+    @Inject(USERS_REPOSITORY)
+    private readonly usersRepository: UsersRepository,
+  ) {}
+
+  findById(id: string): Promise<UserModel | null> {
+    return this.usersRepository.findById(id);
+  }
+
+  findByEmail(email: string): Promise<UserModel | null> {
+    return this.usersRepository.findByEmail(email);
+  }
+
+  createUser(input: CreateUserInput): Promise<UserModel> {
+    return this.usersRepository.create(input);
+  }
+}

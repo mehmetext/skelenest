@@ -1,0 +1,47 @@
+import { Injectable } from '@nestjs/common';
+import { InjectModel } from '@nestjs/sequelize';
+import { UserModel } from '../../../../database/models/user.model';
+import type {
+  CreateUserInput,
+  UsersRepository,
+} from '../../application/ports/users-repository.port';
+import type { UserEntity } from '../../domain/entities/user.entity';
+
+function toEntity(record: UserModel): UserEntity {
+  return {
+    id: record.id,
+    email: record.email,
+    passwordHash: record.passwordHash,
+    firstName: record.firstName,
+    lastName: record.lastName,
+  };
+}
+
+@Injectable()
+export class SequelizeUsersRepository implements UsersRepository {
+  constructor(
+    @InjectModel(UserModel)
+    private readonly users: typeof UserModel,
+  ) {}
+
+  async findById(id: string): Promise<UserEntity | null> {
+    const user = await this.users.findByPk(id);
+    return user ? toEntity(user) : null;
+  }
+
+  async findByEmail(email: string): Promise<UserEntity | null> {
+    const user = await this.users.findOne({ where: { email } });
+    return user ? toEntity(user) : null;
+  }
+
+  async create(input: CreateUserInput): Promise<UserEntity> {
+    const user = await this.users.create({
+      email: input.email,
+      passwordHash: input.passwordHash,
+      firstName: input.firstName ?? null,
+      lastName: input.lastName ?? null,
+    });
+
+    return toEntity(user);
+  }
+}

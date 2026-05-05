@@ -62,7 +62,7 @@ function getGroup(groupId) {
 }
 
 function expectedToSucceed({ orm, modules }) {
-  return !(modules.includes("auth") && orm !== "prisma");
+  return !(modules.includes("auth") && !["prisma", "sequelize"].includes(orm));
 }
 
 function createSelectionCases() {
@@ -343,29 +343,73 @@ function verifyAuthVariant(outputRoot, selectionCase) {
   );
   const includesRedis = effectiveOptionIds.has("redis");
   const includesSwagger = effectiveOptionIds.has("swagger");
-  const schemaPath = path.join(outputRoot, "prisma", "schema.prisma");
-  const schema = fs.readFileSync(schemaPath, "utf8");
 
-  ensure(schema.includes("model User"), "auth scaffold must include User model");
+  if (selectionCase.orm === "prisma") {
+    const schemaPath = path.join(outputRoot, "prisma", "schema.prisma");
+    const schema = fs.readFileSync(schemaPath, "utf8");
 
-  if (includesRedis) {
-    ensure(
-      !schema.includes("model RefreshSession"),
-      "RefreshSession must not be generated when redis is selected"
+    ensure(schema.includes("model User"), "auth scaffold must include User model");
+
+    if (includesRedis) {
+      ensure(
+        !schema.includes("model RefreshSession"),
+        "RefreshSession must not be generated when redis is selected"
+      );
+      ensure(
+        !schema.includes("model RevokedAccessToken"),
+        "RevokedAccessToken must not be generated when redis is selected"
+      );
+    } else {
+      ensure(
+        schema.includes("model RefreshSession"),
+        "RefreshSession must be generated when redis is not selected"
+      );
+      ensure(
+        schema.includes("model RevokedAccessToken"),
+        "RevokedAccessToken must be generated when redis is not selected"
+      );
+    }
+  }
+
+  if (selectionCase.orm === "sequelize") {
+    const userModelPath = path.join(outputRoot, "src", "database", "models", "user.model.ts");
+    const refreshModelPath = path.join(outputRoot, "src", "database", "models", "refresh-session.model.ts");
+    const revokedModelPath = path.join(outputRoot, "src", "database", "models", "revoked-access-token.model.ts");
+    const sequelizeConfig = fs.readFileSync(
+      path.join(outputRoot, "src", "database", "sequelize.config.ts"),
+      "utf8"
     );
+
+    ensure(fs.existsSync(userModelPath), "sequelize auth scaffold must include UserModel");
     ensure(
-      !schema.includes("model RevokedAccessToken"),
-      "RevokedAccessToken must not be generated when redis is selected"
+      sequelizeConfig.includes("UserModel"),
+      "sequelize auth scaffold must register UserModel"
     );
-  } else {
-    ensure(
-      schema.includes("model RefreshSession"),
-      "RefreshSession must be generated when redis is not selected"
-    );
-    ensure(
-      schema.includes("model RevokedAccessToken"),
-      "RevokedAccessToken must be generated when redis is not selected"
-    );
+
+    if (includesRedis) {
+      ensure(
+        !fs.existsSync(refreshModelPath),
+        "RefreshSessionModel must not be generated when redis is selected"
+      );
+      ensure(
+        !fs.existsSync(revokedModelPath),
+        "RevokedAccessTokenModel must not be generated when redis is selected"
+      );
+    } else {
+      ensure(
+        fs.existsSync(refreshModelPath),
+        "RefreshSessionModel must be generated when redis is not selected"
+      );
+      ensure(
+        fs.existsSync(revokedModelPath),
+        "RevokedAccessTokenModel must be generated when redis is not selected"
+      );
+      ensure(
+        sequelizeConfig.includes("RefreshSessionModel") &&
+          sequelizeConfig.includes("RevokedAccessTokenModel"),
+        "sequelize auth scaffold must register auth session models"
+      );
+    }
   }
 
   if (selectionCase.architecture === "standard") {
@@ -389,7 +433,13 @@ function verifyAuthVariant(outputRoot, selectionCase) {
         !authService.includes("this.prisma.refreshSession"),
         "standard auth must not use prisma refresh sessions when redis is selected"
       );
-    } else {
+      if (selectionCase.orm === "sequelize") {
+        ensure(
+          authService.includes("private readonly usersService: UsersService"),
+          "standard sequelize auth must keep user persistence in UsersService when redis is selected"
+        );
+      }
+    } else if (selectionCase.orm === "prisma") {
       ensure(
         !authService.includes("@InjectRedis() private readonly redis: Redis"),
         "standard auth must not inject redis when redis is not selected"
@@ -397,6 +447,15 @@ function verifyAuthVariant(outputRoot, selectionCase) {
       ensure(
         authService.includes("this.prisma.refreshSession"),
         "standard auth must use prisma refresh sessions when redis is not selected"
+      );
+    } else {
+      ensure(
+        authService.includes("private readonly refreshSessions: typeof RefreshSessionModel"),
+        "standard sequelize auth must inject refresh session model when redis is not selected"
+      );
+      ensure(
+        authService.includes("this.refreshSessions"),
+        "standard sequelize auth must use sequelize refresh sessions when redis is not selected"
       );
     }
 
@@ -449,10 +508,21 @@ function verifyAuthVariant(outputRoot, selectionCase) {
     "redis-auth-session-store.adapter.ts"
   );
 
+  const sequelizeAdapterPath = path.join(
+    authBaseDir,
+    "infrastructure",
+    "cache",
+    "sequelize-auth-session-store.adapter.ts"
+  );
+
   if (includesRedis) {
     ensure(
       !fs.existsSync(prismaAdapterPath),
       `${selectionCase.architecture} auth must not generate prisma adapter when redis is selected`
+    );
+    ensure(
+      !fs.existsSync(sequelizeAdapterPath),
+      `${selectionCase.architecture} auth must not generate sequelize adapter when redis is selected`
     );
     ensure(
       fs.existsSync(redisAdapterPath),
@@ -462,10 +532,14 @@ function verifyAuthVariant(outputRoot, selectionCase) {
       authModule.includes("useClass: RedisAuthSessionStoreAdapter"),
       `${selectionCase.architecture} auth must wire RedisAuthSessionStoreAdapter when redis is selected`
     );
-  } else {
+  } else if (selectionCase.orm === "prisma") {
     ensure(
       fs.existsSync(prismaAdapterPath),
       `${selectionCase.architecture} auth must generate prisma adapter when redis is not selected`
+    );
+    ensure(
+      !fs.existsSync(sequelizeAdapterPath),
+      `${selectionCase.architecture} auth must not generate sequelize adapter for prisma auth`
     );
     ensure(
       !fs.existsSync(redisAdapterPath),
@@ -474,6 +548,23 @@ function verifyAuthVariant(outputRoot, selectionCase) {
     ensure(
       authModule.includes("useClass: PrismaAuthSessionStoreAdapter"),
       `${selectionCase.architecture} auth must wire PrismaAuthSessionStoreAdapter when redis is not selected`
+    );
+  } else {
+    ensure(
+      !fs.existsSync(prismaAdapterPath),
+      `${selectionCase.architecture} auth must not generate prisma adapter for sequelize auth`
+    );
+    ensure(
+      fs.existsSync(sequelizeAdapterPath),
+      `${selectionCase.architecture} auth must generate sequelize adapter when redis is not selected`
+    );
+    ensure(
+      !fs.existsSync(redisAdapterPath),
+      `${selectionCase.architecture} auth must not generate redis adapter when redis is not selected`
+    );
+    ensure(
+      authModule.includes("useClass: SequelizeAuthSessionStoreAdapter"),
+      `${selectionCase.architecture} auth must wire SequelizeAuthSessionStoreAdapter when redis is not selected`
     );
   }
 

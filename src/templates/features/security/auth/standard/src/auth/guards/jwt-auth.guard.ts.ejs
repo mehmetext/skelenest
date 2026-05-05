@@ -1,8 +1,14 @@
 <%_ const includesRedis = selectedOptionIds.includes('redis'); _%>
+<%_ const isSequelize = selectedOptionIds.includes('sequelize'); _%>
 <%_ if (!includesRedis) { _%>
+<%_ if (isSequelize) { _%>
+import { InjectModel } from "@nestjs/sequelize";
+import { RevokedAccessTokenModel } from "../../database/models/revoked-access-token.model";
+<%_ } else { _%>
 import { PrismaService } from "src/prisma/prisma.service";
 <%_ } _%>
-import { ExecutionContext, Injectable<%_ if (includesRedis) { _%>, UnauthorizedException<%_ } _%> } from "@nestjs/common";
+<%_ } _%>
+import { ExecutionContext, Injectable<% if (includesRedis || isSequelize) { %>, UnauthorizedException<% } %> } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import type { Request } from "express";
 <%_ if (includesRedis) { _%>
@@ -19,7 +25,7 @@ export class JwtAuthGuard extends AuthGuard("jwt") {
     super();
   }
 <%_ } else { _%>
-  constructor(private readonly prisma: PrismaService) {
+  constructor(<%_ if (isSequelize) { _%>@InjectModel(RevokedAccessTokenModel) private readonly revokedAccessTokens: typeof RevokedAccessTokenModel<%_ } else { _%>private readonly prisma: PrismaService<%_ } _%>) {
     super();
   }
 <%_ } _%>
@@ -36,10 +42,12 @@ export class JwtAuthGuard extends AuthGuard("jwt") {
 <%_ } else { _%>
     const request = context.switchToHttp().getRequest<Request>();
     const user = request.user as AuthenticatedRequestUser;
-    const blocked = await this.prisma.revokedAccessToken.findUnique({
+    const blocked = await <% if (isSequelize) { %>this.revokedAccessTokens.findOne({
+      where: { jti: user.jti },
+    })<% } else { %>this.prisma.revokedAccessToken.findUnique({
       where: { jti: user.jti },
       select: { expiresAt: true },
-    });
+    })<% } %>;
     if (blocked && blocked.expiresAt.getTime() > Date.now()) {
       throw new UnauthorizedException("Token has been revoked");
     }

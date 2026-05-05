@@ -64,27 +64,27 @@ function resolveConditionalTemplatePath(
 ): ConditionalTemplateResolution {
   const segments = relativePath.split(path.sep);
   const rewrittenSegments = segments.map((segment) => {
-    const whenMatch = segment.match(/^(.*)\.when-([a-z0-9-]+)(\.[^.]+(?:\.[^.]+)?)$/i);
-    if (whenMatch) {
-      return {
-        include: selectedOptionIds.includes(whenMatch[2]),
-        segment: `${whenMatch[1]}${whenMatch[3]}`,
-      };
-    }
+    let include = true;
+    let rewrittenSegment = segment;
 
-    const unlessMatch = segment.match(
-      /^(.*)\.unless-([a-z0-9-]+)(\.[^.]+(?:\.[^.]+)?)$/i
-    );
-    if (unlessMatch) {
-      return {
-        include: !selectedOptionIds.includes(unlessMatch[2]),
-        segment: `${unlessMatch[1]}${unlessMatch[3]}`,
-      };
+    while (true) {
+      const conditionalMatch = rewrittenSegment.match(
+        /^(.*)\.(when|unless)-([a-z0-9-]+)(\.[^.]+(?:\.[^.]+)?)$/i
+      );
+
+      if (!conditionalMatch) {
+        break;
+      }
+
+      const [, prefix, mode, optionId, extension] = conditionalMatch;
+      const selected = selectedOptionIds.includes(optionId);
+      include = include && (mode === "when" ? selected : !selected);
+      rewrittenSegment = `${prefix}${extension}`;
     }
 
     return {
-      include: true,
-      segment,
+      include,
+      segment: rewrittenSegment,
     };
   });
 

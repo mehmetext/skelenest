@@ -667,8 +667,8 @@ async function checkStarterModules(context: DoctorContext): Promise<DoctorFindin
       }
     }
 
-    if (context.orm !== "prisma") {
-      pushFinding(findings, "warn", "Unexpected auth/ORM pairing", "The starter auth module is designed for Prisma-backed projects.");
+    if (context.orm !== "prisma" && context.orm !== "sequelize") {
+      pushFinding(findings, "warn", "Unexpected auth/ORM pairing", "The starter auth module is designed for Prisma or Sequelize backed projects.");
     }
 
     if (context.appModuleContent.includes("AuthModule")) {
@@ -704,6 +704,36 @@ async function checkStarterModules(context: DoctorContext): Promise<DoctorFindin
         } else {
           pushFinding(findings, "error", "Prisma auth session models missing", "Non-Redis auth starter projects should include RefreshSession and RevokedAccessToken models.");
         }
+      }
+    }
+
+    if (context.orm === "sequelize") {
+      const userModelPath = "src/database/models/user.model.ts";
+      const refreshModelPath = "src/database/models/refresh-session.model.ts";
+      const revokedModelPath = "src/database/models/revoked-access-token.model.ts";
+
+      if (await pathExists(context.cwd, userModelPath)) {
+        pushFinding(findings, "ok", "Sequelize User model found", `${userModelPath} exists.`);
+      } else {
+        pushFinding(findings, "error", "Sequelize User model missing", `${userModelPath} should exist when auth is selected.`);
+      }
+
+      if (context.features.has("redis")) {
+        if (
+          !(await pathExists(context.cwd, refreshModelPath)) &&
+          !(await pathExists(context.cwd, revokedModelPath))
+        ) {
+          pushFinding(findings, "ok", "Redis auth session mode found", "Sequelize auth session models are absent, matching Redis-backed auth sessions.");
+        } else {
+          pushFinding(findings, "warn", "Sequelize auth session models still present", "Redis-backed auth sessions usually do not need RefreshSessionModel or RevokedAccessTokenModel.");
+        }
+      } else if (
+        (await pathExists(context.cwd, refreshModelPath)) &&
+        (await pathExists(context.cwd, revokedModelPath))
+      ) {
+        pushFinding(findings, "ok", "Sequelize auth session models found", "Auth session models exist for non-Redis auth.");
+      } else {
+        pushFinding(findings, "error", "Sequelize auth session models missing", "Non-Redis auth starter projects should include RefreshSessionModel and RevokedAccessTokenModel.");
       }
     }
   }

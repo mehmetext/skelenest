@@ -1,0 +1,64 @@
+import type {
+  CreationOptional,
+  InferAttributes,
+  InferCreationAttributes,
+} from 'sequelize';
+import {
+  Column,
+  CreatedAt,
+  DataType,
+  Model,
+  PrimaryKey,
+  Table,
+  UpdatedAt,
+} from 'sequelize-typescript';
+
+@Table({
+  tableName: 'users',
+  underscored: true,
+})
+export class UserModel extends Model<
+  InferAttributes<UserModel>,
+  InferCreationAttributes<UserModel>
+> {
+  @PrimaryKey
+  @Column({
+    defaultValue: DataType.UUIDV4,
+    type: DataType.UUID,
+  })
+  declare id: CreationOptional<string>;
+
+  @Column({
+    allowNull: false,
+    type: DataType.STRING,
+    unique: true,
+  })
+  declare email: string;
+
+  @Column({
+    allowNull: false,
+    field: 'password_hash',
+    type: DataType.STRING,
+  })
+  declare passwordHash: string;
+
+  @Column({
+    allowNull: true,
+    field: 'first_name',
+    type: DataType.STRING,
+  })
+  declare firstName: string | null;
+
+  @Column({
+    allowNull: true,
+    field: 'last_name',
+    type: DataType.STRING,
+  })
+  declare lastName: string | null;
+
+  @CreatedAt
+  declare createdAt: CreationOptional<Date>;
+
+  @UpdatedAt
+  declare updatedAt: CreationOptional<Date>;
+}

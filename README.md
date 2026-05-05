@@ -190,7 +190,7 @@ Some options are dependency-aware. For example, selecting `BullMQ` automatically
 | `--features bullmq` | `bullmq` | Adds BullMQ and implicitly pulls in the Redis stack |
 | `--features throttler` | `throttler` | Adds global throttling and Redis-backed storage when Redis is selected |
 | `--features docker` | `docker` | Adds `Dockerfile`, `.dockerignore`, and `docker-compose.yml` |
-| `--modules auth` | `auth` | Adds auth and users starter modules tailored to the selected architecture |
+| `--modules auth` | `auth` | Adds auth and users starter modules tailored to the selected architecture; supported with Prisma or Sequelize |
 
 ## Generation model
 
