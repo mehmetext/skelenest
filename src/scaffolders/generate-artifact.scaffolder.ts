@@ -15,6 +15,7 @@ import {
 } from "../generate/project-context";
 import { runPackageManagerFormat } from "../utils";
 import { BaseScaffolder } from "./base.scaffolder";
+import { confirmCleanGitWorkingTree } from "./git-working-tree.guard";
 
 type ArtifactMode = "dto" | "use-case";
 
@@ -29,6 +30,11 @@ export class GenerateArtifactScaffolder extends BaseScaffolder {
 
   async execute(): Promise<void> {
     const context = await loadGenerateProjectContext(process.cwd());
+
+    if (!(await confirmCleanGitWorkingTree(context.cwd))) {
+      return;
+    }
+
     const target = await resolveModuleTarget(context, this.moduleName);
     const artifact = createArtifactNames(this.artifactName);
 

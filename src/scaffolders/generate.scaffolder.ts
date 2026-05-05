@@ -16,6 +16,7 @@ import {
 } from "../generate/project-updater";
 import { runPackageManagerFormat } from "../utils";
 import { BaseScaffolder } from "./base.scaffolder";
+import { confirmCleanGitWorkingTree } from "./git-working-tree.guard";
 
 type GenerateMode = "module" | "resource";
 
@@ -29,6 +30,11 @@ export class GenerateScaffolder extends BaseScaffolder {
 
   async execute(): Promise<void> {
     const context = await loadGenerateProjectContext(process.cwd());
+
+    if (!(await confirmCleanGitWorkingTree(context.cwd))) {
+      return;
+    }
+
     const names = createResourceNames(this.inputName);
     const moduleRoot =
       context.architecture === "standard"
