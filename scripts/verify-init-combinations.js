@@ -241,6 +241,49 @@ function verifyFeatureDependencies(blueprint, selectionCase) {
     );
   }
 
+  if (selectionCase.features.includes("elasticsearch")) {
+    ensure(
+      packageJson.dependencies["@elastic/elasticsearch"],
+      "@elastic/elasticsearch dependency missing when elasticsearch is selected"
+    );
+    ensure(
+      packageJson.dependencies["@nestjs/elasticsearch"],
+      "@nestjs/elasticsearch dependency missing when elasticsearch is selected"
+    );
+    ensure(
+      envEntries.some((entry) => entry.startsWith("ELASTICSEARCH_NODE=")),
+      "ELASTICSEARCH_NODE must be present when elasticsearch is selected"
+    );
+    ensure(
+      envEntries.some((entry) => entry.startsWith("ELASTICSEARCH_USERNAME=")),
+      "ELASTICSEARCH_USERNAME must be present when elasticsearch is selected"
+    );
+    ensure(
+      envEntries.some((entry) => entry.startsWith("ELASTICSEARCH_PASSWORD=")),
+      "ELASTICSEARCH_PASSWORD must be present when elasticsearch is selected"
+    );
+    if (selectionCase.features.includes("docker")) {
+      ensure(
+        envEntries.some((entry) => entry.startsWith("KIBANA_PASSWORD=")),
+        "KIBANA_PASSWORD must be present when docker and elasticsearch are selected"
+      );
+    } else {
+      ensure(
+        !envEntries.some((entry) => entry.startsWith("KIBANA_PASSWORD=")),
+        "KIBANA_PASSWORD should not be present without docker"
+      );
+    }
+  } else {
+    ensure(
+      !envEntries.some((entry) => entry.startsWith("ELASTICSEARCH_")),
+      "ELASTICSEARCH_* env entries should not be present without elasticsearch"
+    );
+    ensure(
+      !envEntries.some((entry) => entry.startsWith("KIBANA_PASSWORD=")),
+      "KIBANA_PASSWORD should not be present without elasticsearch"
+    );
+  }
+
   if (selectionCase.orm === "none") {
     ensure(
       !envEntries.some((entry) => entry.startsWith('DATABASE_URL=')),
@@ -273,6 +316,17 @@ function verifyOptionalFeatureLeakage(blueprint, selectionCase) {
     ensure(
       !packageJson.dependencies["ioredis"],
       "ioredis should not be present when redis is not selected"
+    );
+  }
+
+  if (!selectedOptionIds.has("elasticsearch")) {
+    ensure(
+      !packageJson.dependencies["@elastic/elasticsearch"],
+      "@elastic/elasticsearch should not be present when elasticsearch is not selected"
+    );
+    ensure(
+      !packageJson.dependencies["@nestjs/elasticsearch"],
+      "@nestjs/elasticsearch should not be present when elasticsearch is not selected"
     );
   }
 }

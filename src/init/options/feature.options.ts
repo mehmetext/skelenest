@@ -6,6 +6,8 @@ import { InitPromptData } from "../types";
 const featureTemplateRoot = (...segments: string[]): string =>
   path.join(resolveTemplatesRoot(__dirname), "features", ...segments);
 
+const ELASTIC_STACK_VERSION = "9.3.4";
+
 export const featureOptions: TechnologyOption<InitPromptData>[] = [
   {
     id: "docker",
@@ -17,6 +19,9 @@ export const featureOptions: TechnologyOption<InitPromptData>[] = [
         docker: {
           includesDatabase: context.has("prisma") || context.has("typeorm") || context.has("sequelize"),
           includesRedis: context.has("redis") || context.has("bullmq"),
+          includesElasticsearch: context.has("elasticsearch"),
+          includesKibana: context.has("elasticsearch"),
+          elasticStackVersion: ELASTIC_STACK_VERSION,
         },
       },
       packageJson: {
@@ -85,6 +90,43 @@ export const featureOptions: TechnologyOption<InitPromptData>[] = [
       packageJson: {
         dependencies: {
           "@nestjs/swagger": "^11.4.2",
+        },
+      },
+    }),
+  },
+  {
+    id: "elasticsearch",
+    label: "Elasticsearch",
+    description: "Configures ElasticsearchModule with environment-based auth",
+    contribute: (context) => ({
+      slots: {
+        "app.module.imports": [
+          "import { ElasticsearchModule } from '@nestjs/elasticsearch';",
+        ],
+        "app.module.moduleImports": [
+          `ElasticsearchModule.registerAsync({
+      imports: [ConfigModule],
+      useFactory: (configService: ConfigService) => ({
+        node: configService.getOrThrow('ELASTICSEARCH_NODE'),
+        auth: {
+          username: configService.getOrThrow('ELASTICSEARCH_USERNAME'),
+          password: configService.getOrThrow('ELASTICSEARCH_PASSWORD'),
+        },
+      }),
+      inject: [ConfigService],
+    })`,
+        ],
+        "env.entries": [
+          `ELASTICSEARCH_NODE="http://${context.has("docker") ? "elasticsearch" : "localhost"}:9200"`,
+          `ELASTICSEARCH_USERNAME="elastic"`,
+          `ELASTICSEARCH_PASSWORD="changeme"`,
+          ...(context.has("docker") ? [`KIBANA_PASSWORD="changeme"`] : []),
+        ],
+      },
+      packageJson: {
+        dependencies: {
+          "@elastic/elasticsearch": "^9.3.4",
+          "@nestjs/elasticsearch": "^11.1.0",
         },
       },
     }),

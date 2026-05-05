@@ -6,7 +6,7 @@ services:
     container_name: <%= name %>-app
     networks:
       - internal
-<% if (docker.includesDatabase || docker.includesRedis) { %>
+<% if (docker.includesDatabase || docker.includesRedis || docker.includesElasticsearch || docker.includesKibana) { %>
     depends_on:
 <% if (docker.includesDatabase) { %>
       postgres:
@@ -16,10 +16,19 @@ services:
       redis:
         condition: service_healthy
 <% } %>
+<% if (docker.includesElasticsearch) { %>
+      elasticsearch:
+        condition: service_healthy
 <% } %>
-<% if (docker.includesRedis) { %>
+<% } %>
+<% if (docker.includesRedis || docker.includesElasticsearch) { %>
     environment:
+<% if (docker.includesRedis) { %>
       REDIS_URL: redis://redis:6379
+<% } %>
+<% if (docker.includesElasticsearch) { %>
+      ELASTICSEARCH_NODE: http://elasticsearch:9200
+<% } %>
 <% } %>
     env_file:
       - .env
@@ -70,16 +79,88 @@ services:
       retries: 10
 <% } %>
 
+<% if (docker.includesElasticsearch) { %>
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:<%= docker.elasticStackVersion %>
+    container_name: <%= name %>-elasticsearch
+    networks:
+      - internal
+    restart: unless-stopped
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "true"
+      ELASTIC_PASSWORD: ${ELASTICSEARCH_PASSWORD:-changeme}
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS -u elastic:$${ELASTIC_PASSWORD} http://localhost:9200 >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+<% } %>
+
+<% if (docker.includesKibana) { %>
+  elasticsearch-setup:
+    image: curlimages/curl:8.16.0
+    container_name: <%= name %>-elasticsearch-setup
+    networks:
+      - internal
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    environment:
+      ELASTICSEARCH_PASSWORD: ${ELASTICSEARCH_PASSWORD:-changeme}
+      KIBANA_PASSWORD: ${KIBANA_PASSWORD:-changeme}
+    command:
+      - sh
+      - -c
+      - |
+        curl -fsS -u "elastic:$${ELASTICSEARCH_PASSWORD}" \
+          -H "Content-Type: application/json" \
+          -X POST http://elasticsearch:9200/_security/user/kibana_system/_password \
+          -d "{\"password\":\"$${KIBANA_PASSWORD}\"}"
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:<%= docker.elasticStackVersion %>
+    container_name: <%= name %>-kibana
+    networks:
+      - internal
+    restart: unless-stopped
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      elasticsearch-setup:
+        condition: service_completed_successfully
+    environment:
+      SERVER_NAME: <%= name %>-kibana
+      ELASTICSEARCH_HOSTS: '["http://elasticsearch:9200"]'
+      ELASTICSEARCH_USERNAME: kibana_system
+      ELASTICSEARCH_PASSWORD: ${KIBANA_PASSWORD:-changeme}
+    ports:
+      - "5601:5601"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:5601/api/status >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+<% } %>
+
 networks:
   internal:
     driver: bridge
 
-<% if (docker.includesDatabase || docker.includesRedis) { %>
+<% if (docker.includesDatabase || docker.includesRedis || docker.includesElasticsearch || docker.includesKibana) { %>
 volumes:
 <% if (docker.includesDatabase) { %>
   postgres-data:
 <% } %>
 <% if (docker.includesRedis) { %>
   redis-data:
+<% } %>
+<% if (docker.includesElasticsearch) { %>
+  elasticsearch-data:
 <% } %>
 <% } %>

@@ -1,6 +1,7 @@
 <%_ const includesRedis = selectedOptionIds.includes('redis'); _%>
 <%_ const includesBullmq = selectedOptionIds.includes('bullmq'); _%>
 <%_ const includesThrottler = selectedOptionIds.includes('throttler'); _%>
+<%_ const includesElasticsearch = selectedOptionIds.includes('elasticsearch'); _%>
 <%_ if (includesRedis) { _%>
 import { RedisModule } from '@nestjs-modules/ioredis';
 <%_ } _%>
@@ -11,7 +12,7 @@ import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis'
 import { BullModule } from '@nestjs/bullmq';
 <%_ } _%>
 import { Module } from '@nestjs/common';
-import { ConfigModule<%_ if (includesRedis || includesBullmq || includesThrottler) { _%>, ConfigService<%_ } _%> } from '@nestjs/config';
+import { ConfigModule<% if (includesRedis || includesBullmq || includesThrottler || includesElasticsearch) { %>, ConfigService<% } %> } from '@nestjs/config';
 <%_ if (includesThrottler) { _%>
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';

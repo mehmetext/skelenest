@@ -143,6 +143,16 @@ Sequelize is the selected ORM.
 <%_ } else { _%>
 - Swagger is not selected. Do not add `@nestjs/swagger` imports or decorators.
 <%_ } _%>
+<%_ if (selectedOptionIds.includes('elasticsearch')) { _%>
+- Elasticsearch is selected. Use the existing `ElasticsearchModule` wiring and `ELASTICSEARCH_*` configuration.
+- Keep index names, mappings, and search DTOs explicit and close to the feature that owns them.
+- Do not create ad hoc Elasticsearch clients when the configured Nest module client is available.
+<%_ if (selectedOptionIds.includes('docker')) { _%>
+- Docker Compose includes Kibana for the Elasticsearch dashboard at `http://localhost:5601`; keep its version aligned with Elasticsearch.
+<%_ } _%>
+<%_ } else { _%>
+- Elasticsearch is not selected. Do not add Elasticsearch dependencies, clients, modules, environment variables, or Docker services.
+<%_ } _%>
 <%_ if (selectedOptionIds.includes('docker')) { _%>
 - Docker is selected. Keep runtime service changes reflected in `Dockerfile` and `docker-compose.yml`.
 - If a new runtime dependency is added, add the service, health/env wiring, and local connection defaults together.

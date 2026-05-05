@@ -534,6 +534,63 @@ async function checkFeatures(context: DoctorContext): Promise<DoctorFinding[]> {
     }
   }
 
+  if (context.features.has("elasticsearch")) {
+    for (const key of [
+      "ELASTICSEARCH_NODE",
+      "ELASTICSEARCH_USERNAME",
+      "ELASTICSEARCH_PASSWORD",
+    ]) {
+      if (key in context.env) {
+        pushFinding(findings, "ok", "Elasticsearch env found", `.env contains ${key}.`);
+      } else {
+        pushFinding(findings, "error", "Elasticsearch env missing", `${key} should be defined when Elasticsearch is selected.`);
+      }
+    }
+
+    if (context.features.has("docker")) {
+      if ("KIBANA_PASSWORD" in context.env) {
+        pushFinding(findings, "ok", "Kibana env found", ".env contains KIBANA_PASSWORD for the Docker dashboard.");
+      } else {
+        pushFinding(findings, "warn", "Kibana env missing", "Docker-enabled Elasticsearch projects should define KIBANA_PASSWORD for Kibana.");
+      }
+    }
+
+    for (const dep of ["@elastic/elasticsearch", "@nestjs/elasticsearch"]) {
+      if (hasDependency(context, dep)) {
+        pushFinding(findings, "ok", "Elasticsearch dependency found", `${dep} is installed.`);
+      } else {
+        pushFinding(findings, "error", "Elasticsearch dependency missing", `${dep} should be present when Elasticsearch is selected.`);
+      }
+    }
+
+    if (context.appModuleContent.includes("ElasticsearchModule.registerAsync")) {
+      pushFinding(findings, "ok", "Elasticsearch wiring found", "AppModule configures ElasticsearchModule.registerAsync.");
+    } else {
+      pushFinding(findings, "error", "Elasticsearch wiring missing", "AppModule should configure ElasticsearchModule.registerAsync.");
+    }
+  } else {
+    const elasticsearchLeakSignals = [
+      "ELASTICSEARCH_NODE" in context.env,
+      "ELASTICSEARCH_USERNAME" in context.env,
+      "ELASTICSEARCH_PASSWORD" in context.env,
+      "KIBANA_PASSWORD" in context.env,
+      hasDependency(context, "@elastic/elasticsearch"),
+      hasDependency(context, "@nestjs/elasticsearch"),
+      context.appModuleContent.includes("ElasticsearchModule.registerAsync"),
+    ];
+
+    if (elasticsearchLeakSignals.some(Boolean)) {
+      pushFinding(
+        findings,
+        "warn",
+        "Unexpected Elasticsearch wiring",
+        "Elasticsearch is not selected, but Elasticsearch env/config/dependencies were still detected."
+      );
+    } else {
+      pushFinding(findings, "ok", "No Elasticsearch leakage", "Elasticsearch-only wiring is absent as expected.");
+    }
+  }
+
   if (context.features.has("docker")) {
     for (const file of ["Dockerfile", "docker-compose.yml"]) {
       if (await pathExists(context.cwd, file)) {
