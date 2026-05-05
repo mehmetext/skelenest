@@ -164,11 +164,11 @@ Sequelize is the selected ORM.
 ## Auth Rules
 
 <%_ if (Array.isArray(selections.modules) && selections.modules.includes('auth')) { _%>
-- Auth starter module is selected and is <%= selections.orm === 'sequelize' ? 'Sequelize-backed' : 'Prisma-backed' %>.
+- Auth starter module is selected and is <%= selections.orm === 'sequelize' ? 'Sequelize-backed' : selections.orm === 'typeorm' ? 'TypeORM-backed' : 'Prisma-backed' %>.
 <%_ if (selectedOptionIds.includes('redis')) { _%>
 - Auth sessions and access-token blocklisting use Redis. Do not add ORM-backed refresh-session or revoked-token models.
 <%_ } else { _%>
-- Auth sessions and access-token blocklisting use <%= selections.orm === 'sequelize' ? 'Sequelize models' : 'Prisma models' %>. Do not add Redis auth session code.
+- Auth sessions and access-token blocklisting use <%= selections.orm === 'sequelize' ? 'Sequelize models' : selections.orm === 'typeorm' ? 'TypeORM entities' : 'Prisma models' %>. Do not add Redis auth session code.
 <%_ } _%>
 - Keep password hashing, token creation, guards, strategies, and DTOs in the generated auth module structure for the selected architecture.
 - Never return password hashes, refresh-token hashes, token identifiers, or session internals from controllers.

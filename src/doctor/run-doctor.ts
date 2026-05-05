@@ -667,8 +667,12 @@ async function checkStarterModules(context: DoctorContext): Promise<DoctorFindin
       }
     }
 
-    if (context.orm !== "prisma" && context.orm !== "sequelize") {
-      pushFinding(findings, "warn", "Unexpected auth/ORM pairing", "The starter auth module is designed for Prisma or Sequelize backed projects.");
+    if (
+      context.orm !== "prisma" &&
+      context.orm !== "typeorm" &&
+      context.orm !== "sequelize"
+    ) {
+      pushFinding(findings, "warn", "Unexpected auth/ORM pairing", "The starter auth module is designed for Prisma, TypeORM, or Sequelize backed projects.");
     }
 
     if (context.appModuleContent.includes("AuthModule")) {
@@ -734,6 +738,36 @@ async function checkStarterModules(context: DoctorContext): Promise<DoctorFindin
         pushFinding(findings, "ok", "Sequelize auth session models found", "Auth session models exist for non-Redis auth.");
       } else {
         pushFinding(findings, "error", "Sequelize auth session models missing", "Non-Redis auth starter projects should include RefreshSessionModel and RevokedAccessTokenModel.");
+      }
+    }
+
+    if (context.orm === "typeorm") {
+      const userEntityPath = "src/database/entities/user.entity.ts";
+      const refreshEntityPath = "src/database/entities/refresh-session.entity.ts";
+      const revokedEntityPath = "src/database/entities/revoked-access-token.entity.ts";
+
+      if (await pathExists(context.cwd, userEntityPath)) {
+        pushFinding(findings, "ok", "TypeORM User entity found", `${userEntityPath} exists.`);
+      } else {
+        pushFinding(findings, "error", "TypeORM User entity missing", `${userEntityPath} should exist when auth is selected.`);
+      }
+
+      if (context.features.has("redis")) {
+        if (
+          !(await pathExists(context.cwd, refreshEntityPath)) &&
+          !(await pathExists(context.cwd, revokedEntityPath))
+        ) {
+          pushFinding(findings, "ok", "Redis auth session mode found", "TypeORM auth session entities are absent, matching Redis-backed auth sessions.");
+        } else {
+          pushFinding(findings, "warn", "TypeORM auth session entities still present", "Redis-backed auth sessions usually do not need RefreshSessionEntity or RevokedAccessTokenEntity.");
+        }
+      } else if (
+        (await pathExists(context.cwd, refreshEntityPath)) &&
+        (await pathExists(context.cwd, revokedEntityPath))
+      ) {
+        pushFinding(findings, "ok", "TypeORM auth session entities found", "Auth session entities exist for non-Redis auth.");
+      } else {
+        pushFinding(findings, "error", "TypeORM auth session entities missing", "Non-Redis auth starter projects should include RefreshSessionEntity and RevokedAccessTokenEntity.");
       }
     }
   }

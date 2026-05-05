@@ -29,7 +29,7 @@ export const authModulePreset: ModulePresetDefinition<InitPromptData> = {
   id: "auth",
   label: "Auth Starter Module",
   supportedArchitectures: ["standard", "clean", "ddd"],
-  supportedOrms: ["prisma", "sequelize"],
+  supportedOrms: ["prisma", "typeorm", "sequelize"],
   resolveContribution(input) {
     const { architecture } = input;
     const includesRedis = input.context.has("redis");
@@ -104,6 +104,23 @@ export const authModulePreset: ModulePresetDefinition<InitPromptData> = {
             []),
           ...(!includesRedis
             ? ["RefreshSessionModel", "RevokedAccessTokenModel"]
+            : []),
+        ],
+        "typeorm.entities.imports": [
+          ...((usersContribution.slots?.["typeorm.entities.imports"] as string[]) ??
+            []),
+          ...(!includesRedis
+            ? [
+                `import { RefreshSessionEntity } from './entities/refresh-session.entity';`,
+                `import { RevokedAccessTokenEntity } from './entities/revoked-access-token.entity';`,
+              ]
+            : []),
+        ],
+        "typeorm.entities.entries": [
+          ...((usersContribution.slots?.["typeorm.entities.entries"] as string[]) ??
+            []),
+          ...(!includesRedis
+            ? ["RefreshSessionEntity", "RevokedAccessTokenEntity"]
             : []),
         ],
       },

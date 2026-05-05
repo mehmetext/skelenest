@@ -1,5 +1,6 @@
 <%_ const includesRedis = selectedOptionIds.includes('redis'); _%>
 <%_ const isSequelize = selectedOptionIds.includes('sequelize'); _%>
+<%_ const isTypeOrm = selectedOptionIds.includes('typeorm'); _%>
 <%_ if (isSequelize) { _%>
 import type { UserModel } from "../database/models/user.model";
 <%_ if (!includesRedis) { _%>
@@ -7,11 +8,19 @@ import { InjectModel } from "@nestjs/sequelize";
 import { RefreshSessionModel } from "../database/models/refresh-session.model";
 import { RevokedAccessTokenModel } from "../database/models/revoked-access-token.model";
 <%_ } _%>
+<%_ } else if (isTypeOrm) { _%>
+import type { UserEntity } from "../database/entities/user.entity";
+<%_ if (!includesRedis) { _%>
+import { InjectRepository } from "@nestjs/typeorm";
+import { RefreshSessionEntity } from "../database/entities/refresh-session.entity";
+import { RevokedAccessTokenEntity } from "../database/entities/revoked-access-token.entity";
+import { Repository } from "typeorm";
+<%_ } _%>
 <%_ } else { _%>
 import type { User } from "src/generated/prisma/client";
 <%_ } _%>
 <%_ if (!includesRedis) { _%>
-<%_ if (!isSequelize) { _%>
+<%_ if (!isSequelize && !isTypeOrm) { _%>
 import { PrismaService } from "src/prisma/prisma.service";
 <%_ } _%>
 <%_ } _%>
@@ -86,6 +95,11 @@ export class AuthService {
     private readonly refreshSessions: typeof RefreshSessionModel,
     @InjectModel(RevokedAccessTokenModel)
     private readonly revokedAccessTokens: typeof RevokedAccessTokenModel,
+<%_ } else if (isTypeOrm) { _%>
+    @InjectRepository(RefreshSessionEntity)
+    private readonly refreshSessions: Repository<RefreshSessionEntity>,
+    @InjectRepository(RevokedAccessTokenEntity)
+    private readonly revokedAccessTokens: Repository<RevokedAccessTokenEntity>,
 <%_ } else { _%>
     private readonly prisma: PrismaService,
 <%_ } _%>
@@ -174,6 +188,8 @@ export class AuthService {
 <%_ } else { _%>
     const session = await <% if (isSequelize) { %>this.refreshSessions.findOne({
       where: { tokenHash: this.hashToken(refreshToken) },
+    })<% } else if (isTypeOrm) { %>this.refreshSessions.findOne({
+      where: { tokenHash: this.hashToken(refreshToken) },
     })<% } else { %>this.prisma.refreshSession.findUnique({
       where: {
         tokenHash: this.hashToken(refreshToken),
@@ -203,6 +219,9 @@ export class AuthService {
           revokedAt: null,
         },
       },
+    )<% } else if (isTypeOrm) { %>this.refreshSessions.update(
+      { tokenHash: this.hashToken(refreshToken) },
+      { revokedAt: new Date() },
     )<% } else { %>this.prisma.refreshSession.updateMany({
       where: {
         tokenHash: this.hashToken(refreshToken),
@@ -250,6 +269,9 @@ export class AuthService {
             revokedAt: null,
           },
         },
+      )<% } else if (isTypeOrm) { %>this.refreshSessions.update(
+        { tokenHash: this.hashToken(refreshToken) },
+        { revokedAt: new Date() },
       )<% } else { %>this.prisma.refreshSession.updateMany({
         where: {
           tokenHash: this.hashToken(refreshToken),
@@ -263,7 +285,10 @@ export class AuthService {
         ? <% if (isSequelize) { %>this.revokedAccessTokens.upsert({
             jti: accessTokenJti,
             expiresAt: new Date(Date.now() + ttl * 1000),
-          })<% } else { %>this.prisma.revokedAccessToken.upsert({
+          })<% } else if (isTypeOrm) { %>this.revokedAccessTokens.upsert({
+            jti: accessTokenJti,
+            expiresAt: new Date(Date.now() + ttl * 1000),
+          }, ["jti"])<% } else { %>this.prisma.revokedAccessToken.upsert({
             where: { jti: accessTokenJti },
             update: {
               expiresAt: new Date(Date.now() + ttl * 1000),
@@ -301,7 +326,7 @@ export class AuthService {
     return authUser;
   }
 
-  private async issueTokens(user: <%_ if (isSequelize) { _%>UserModel<%_ } else { _%>User<%_ } _%>): Promise<AuthTokensDto> {
+  private async issueTokens(user: <%_ if (isSequelize) { _%>UserModel<%_ } else if (isTypeOrm) { _%>UserEntity<%_ } else { _%>User<%_ } _%>): Promise<AuthTokensDto> {
     const accessPayload: Omit<AccessTokenPayload, "exp"> = {
       sub: user.id,
       email: user.email,
@@ -339,7 +364,13 @@ export class AuthService {
       userId: user.id,
       expiresAt: new Date(Date.now() + this.refreshTtlSeconds * 1000),
       revokedAt: null,
-    })<% } else { %>this.prisma.refreshSession.upsert({
+    })<% } else if (isTypeOrm) { %>this.refreshSessions.upsert({
+      tokenHash: this.hashToken(refreshToken),
+      jti: refreshPayload.jti,
+      userId: user.id,
+      expiresAt: new Date(Date.now() + this.refreshTtlSeconds * 1000),
+      revokedAt: null,
+    }, ["tokenHash"])<% } else { %>this.prisma.refreshSession.upsert({
       where: {
         tokenHash: this.hashToken(refreshToken),
       },
@@ -437,7 +468,7 @@ export class AuthService {
     return randomBytes(TOKEN_ID_BYTES).toString("hex");
   }
 
-  private toAuthResponse(user: <%_ if (isSequelize) { _%>UserModel<%_ } else { _%>User<%_ } _%>, tokens: AuthTokensDto): AuthResponseDto {
+  private toAuthResponse(user: <%_ if (isSequelize) { _%>UserModel<%_ } else if (isTypeOrm) { _%>UserEntity<%_ } else { _%>User<%_ } _%>, tokens: AuthTokensDto): AuthResponseDto {
     return {
       user: this.toAuthUser(user),
       accessToken: tokens.accessToken,
@@ -445,7 +476,7 @@ export class AuthService {
     };
   }
 
-  private toAuthUser(user: <%_ if (isSequelize) { _%>UserModel<%_ } else { _%>User<%_ } _%>): AuthUserDto {
+  private toAuthUser(user: <%_ if (isSequelize) { _%>UserModel<%_ } else if (isTypeOrm) { _%>UserEntity<%_ } else { _%>User<%_ } _%>): AuthUserDto {
     return {
       id: user.id,
       email: user.email,

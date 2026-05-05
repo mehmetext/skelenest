@@ -20,6 +20,57 @@ function runCli(cwd, args) {
   });
 }
 
+function listTypeScriptFiles(rootDir) {
+  const files = [];
+
+  for (const item of fs.readdirSync(rootDir, { withFileTypes: true })) {
+    const itemPath = path.join(rootDir, item.name);
+
+    if (item.isDirectory()) {
+      files.push(...listTypeScriptFiles(itemPath));
+    } else if (itemPath.endsWith(".ts")) {
+      files.push(itemPath);
+    }
+  }
+
+  return files;
+}
+
+function verifyGeneratedDatabaseImports(projectDir) {
+  for (const file of listTypeScriptFiles(path.join(projectDir, "src"))) {
+    const source = fs.readFileSync(file, "utf8");
+    const imports = [
+      ...source.matchAll(/import(?:\s+type)?\s+\{([^}]+)\}\s+from\s+['"]([^'"]+)['"]/g),
+    ];
+    const localNames = [];
+
+    for (const match of imports) {
+      const importedNames = match[1];
+      const importPath = match[2];
+
+      for (const importedName of importedNames.split(",")) {
+        const pieces = importedName.trim().split(/\s+as\s+/);
+        localNames.push((pieces[1] || pieces[0]).trim());
+      }
+
+      if (
+        importPath.includes("database/entities/todo.entity") ||
+        importPath.includes("database/models/todo.model")
+      ) {
+        ensure(
+          fs.existsSync(`${path.resolve(path.dirname(file), importPath)}.ts`),
+          `${path.relative(projectDir, file)} should import a generated database file`
+        );
+      }
+    }
+
+    ensure(
+      localNames.filter((localName) => localName === "TodoEntity").length <= 1,
+      `${path.relative(projectDir, file)} should not import duplicate TodoEntity identifiers`
+    );
+  }
+}
+
 async function verifyDoctorJsonOutput() {
   const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), "skelenest-doctor-"));
 
@@ -173,6 +224,47 @@ async function verifyGenerateCommands() {
   }
 }
 
+async function verifyGenerateResourceMatrix() {
+  const architectures = ["standard", "clean", "ddd"];
+  const orms = ["prisma", "typeorm", "sequelize", "none"];
+
+  for (const architecture of architectures) {
+    for (const orm of orms) {
+      const projectDir = fs.mkdtempSync(
+        path.join(os.tmpdir(), `skelenest-generate-${architecture}-${orm}-`)
+      );
+
+      try {
+        const blueprint = createInitBlueprint({
+          name: `generate-${architecture}-${orm}-app`,
+          port: "3000",
+          packageManager: "pnpm",
+          installDependencies: false,
+          initializeGit: false,
+          selections: {
+            orm,
+            architecture,
+            features: ["swagger", "redis", "throttler"],
+            modules: orm === "none" ? [] : ["auth"],
+          },
+        });
+
+        await copyTemplateTree({
+          templateRoots: blueprint.templateRoots,
+          outputRoot: projectDir,
+          data: blueprint.templateData,
+          slots: blueprint.slots,
+        });
+
+        runCli(projectDir, ["generate", "resource", "todos"]);
+        verifyGeneratedDatabaseImports(projectDir);
+      } finally {
+        fs.rmSync(projectDir, { recursive: true, force: true });
+      }
+    }
+  }
+}
+
 function verifyNonInteractiveInit() {
   const workspaceDir = fs.mkdtempSync(
     path.join(os.tmpdir(), "skelenest-init-flags-")
@@ -241,9 +333,10 @@ function verifyNonInteractiveInit() {
 async function main() {
   await verifyDoctorJsonOutput();
   await verifyGenerateCommands();
+  await verifyGenerateResourceMatrix();
   verifyNonInteractiveInit();
   console.log(
-    "Verified doctor JSON output, generate command workflows, and non-interactive init."
+    "Verified doctor JSON output, generate command workflows, resource matrix generation, and non-interactive init."
   );
 }
 

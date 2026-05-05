@@ -1,0 +1,50 @@
+import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { UserEntity as UserOrmEntity } from '../../../../database/entities/user.entity';
+import type {
+  CreateUserInput,
+  UsersRepository,
+} from '../../application/ports/users-repository.port';
+import type { UserEntity } from '../../domain/entities/user.entity';
+
+function toEntity(record: UserOrmEntity): UserEntity {
+  return {
+    id: record.id,
+    email: record.email,
+    passwordHash: record.passwordHash,
+    firstName: record.firstName,
+    lastName: record.lastName,
+  };
+}
+
+@Injectable()
+export class TypeOrmUsersRepository implements UsersRepository {
+  constructor(
+    @InjectRepository(UserOrmEntity)
+    private readonly users: Repository<UserOrmEntity>,
+  ) {}
+
+  async findById(id: string): Promise<UserEntity | null> {
+    const user = await this.users.findOne({ where: { id } });
+    return user ? toEntity(user) : null;
+  }
+
+  async findByEmail(email: string): Promise<UserEntity | null> {
+    const user = await this.users.findOne({ where: { email } });
+    return user ? toEntity(user) : null;
+  }
+
+  async create(input: CreateUserInput): Promise<UserEntity> {
+    const user = await this.users.save(
+      this.users.create({
+        email: input.email,
+        passwordHash: input.passwordHash,
+        firstName: input.firstName ?? null,
+        lastName: input.lastName ?? null,
+      }),
+    );
+
+    return toEntity(user);
+  }
+}

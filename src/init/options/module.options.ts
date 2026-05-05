@@ -8,7 +8,7 @@ export const moduleOptions: TechnologyOption<InitPromptData>[] = [
     label: "Auth Starter Module",
     description:
       "Adds an auth module scaffold tailored to the selected architecture",
-    supportedOrms: ["prisma", "sequelize"],
+    supportedOrms: ["prisma", "typeorm", "sequelize"],
     contribute: (context) =>
       resolveModulePresetContribution({
         presetId: "auth",

@@ -1,0 +1,21 @@
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  PrimaryGeneratedColumn,
+} from "typeorm";
+
+@Entity({ name: "revoked_access_tokens" })
+export class RevokedAccessTokenEntity {
+  @PrimaryGeneratedColumn("uuid")
+  id: string;
+
+  @Column({ type: "varchar", length: 255, unique: true })
+  jti: string;
+
+  @Column({ name: "expires_at", type: "timestamp" })
+  expiresAt: Date;
+
+  @CreateDateColumn({ name: "created_at" })
+  createdAt: Date;
+}

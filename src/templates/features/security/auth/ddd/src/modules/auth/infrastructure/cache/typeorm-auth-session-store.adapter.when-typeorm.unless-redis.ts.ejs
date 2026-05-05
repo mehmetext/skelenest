@@ -1,0 +1,96 @@
+import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { createHash } from 'crypto';
+import { Repository } from 'typeorm';
+import { RefreshSessionEntity } from '../../../../database/entities/refresh-session.entity';
+import { RevokedAccessTokenEntity } from '../../../../database/entities/revoked-access-token.entity';
+import type { AuthUserDto } from '../../application/dto/auth.dto';
+import type { AuthSessionStore } from '../../application/ports/auth-session-store.port';
+import type { RefreshTokenPayload } from '../../types';
+
+@Injectable()
+export class TypeOrmAuthSessionStoreAdapter implements AuthSessionStore {
+  constructor(
+    @InjectRepository(RefreshSessionEntity)
+    private readonly refreshSessions: Repository<RefreshSessionEntity>,
+    @InjectRepository(RevokedAccessTokenEntity)
+    private readonly revokedAccessTokens: Repository<RevokedAccessTokenEntity>,
+  ) {}
+
+  async persistRefreshToken(input: {
+    refreshToken: string;
+    payload: RefreshTokenPayload;
+    userId: string;
+    ttlSeconds: number;
+  }): Promise<void> {
+    await this.refreshSessions.upsert(
+      {
+        tokenHash: this.hashToken(input.refreshToken),
+        jti: input.payload.jti,
+        userId: input.userId,
+        expiresAt: new Date(Date.now() + input.ttlSeconds * 1000),
+        revokedAt: null,
+      },
+      ['tokenHash'],
+    );
+  }
+
+  async validateRefreshToken(input: {
+    refreshToken: string;
+    payload: RefreshTokenPayload;
+  }): Promise<{ jti: string; userId: string } | null> {
+    const session = await this.refreshSessions.findOne({
+      where: {
+        tokenHash: this.hashToken(input.refreshToken),
+      },
+    });
+
+    if (!session) return null;
+    if (session.revokedAt) return null;
+    if (session.expiresAt.getTime() <= Date.now()) return null;
+
+    return {
+      jti: session.jti,
+      userId: session.userId,
+    };
+  }
+
+  async revokeRefreshToken(refreshToken: string): Promise<void> {
+    await this.refreshSessions.update(
+      { tokenHash: this.hashToken(refreshToken) },
+      { revokedAt: new Date() },
+    );
+  }
+
+  async blockAccessToken(jti: string, ttlSeconds: number): Promise<void> {
+    if (ttlSeconds <= 0) return;
+
+    await this.revokedAccessTokens.upsert(
+      {
+        jti,
+        expiresAt: new Date(Date.now() + ttlSeconds * 1000),
+      },
+      ['jti'],
+    );
+  }
+
+  async isAccessTokenBlocked(jti: string): Promise<boolean> {
+    const blocked = await this.revokedAccessTokens.findOne({
+      where: { jti },
+    });
+
+    return !!blocked && blocked.expiresAt.getTime() > Date.now();
+  }
+
+  async getCachedUser(): Promise<AuthUserDto | null> {
+    return null;
+  }
+
+  async cacheUser(): Promise<void> {}
+
+  async clearCachedUser(): Promise<void> {}
+
+  private hashToken(token: string): string {
+    return createHash('sha256').update(token).digest('hex');
+  }
+}

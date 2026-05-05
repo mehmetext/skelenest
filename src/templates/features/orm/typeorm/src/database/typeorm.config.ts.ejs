@@ -1,10 +1,17 @@
 import { TypeOrmModuleOptions } from "@nestjs/typeorm";
 import { ExampleEntity } from "./entities/example.entity";
+<%
+const typeOrmEntityImports = getSlot('typeorm.entities.imports');
+const typeOrmEntityEntries = getSlot('typeorm.entities.entries');
+-%>
+<%_ if (typeOrmEntityImports.length > 0) { _%>
+<%- typeOrmEntityImports.join('\n') %>
+<%_ } _%>
 
 export const typeOrmConfig: TypeOrmModuleOptions = {
   type: "postgres",
   url: process.env.DATABASE_URL,
-  entities: [ExampleEntity],
+  entities: [ExampleEntity<%_ if (typeOrmEntityEntries.length > 0) { _%>, <%- typeOrmEntityEntries.join(", ") %><%_ } _%>],
   autoLoadEntities: true,
   synchronize: process.env.NODE_ENV !== "production",
 };

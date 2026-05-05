@@ -1,5 +1,7 @@
 <%_ if (selectedOptionIds.includes('sequelize')) { _%>
 import type { UserModel } from '../../../../database/models/user.model';
+<%_ } else if (selectedOptionIds.includes('typeorm')) { _%>
+import type { UserEntity } from '../../../../database/entities/user.entity';
 <%_ } else { _%>
 import type { User } from 'src/generated/prisma/client';
 <%_ } _%>
@@ -9,7 +11,7 @@ import type { AuthResponseDto, AuthUserDto } from '../dto/auth.dto';
 @Injectable()
 export class AuthUserMapperService {
   toAuthResponse(
-    user: <%_ if (selectedOptionIds.includes('sequelize')) { _%>UserModel<%_ } else { _%>User<%_ } _%>,
+    user: <%_ if (selectedOptionIds.includes('sequelize')) { _%>UserModel<%_ } else if (selectedOptionIds.includes('typeorm')) { _%>UserEntity<%_ } else { _%>User<%_ } _%>,
     tokens: { accessToken: string; refreshToken: string },
   ): AuthResponseDto {
     return {
@@ -19,7 +21,7 @@ export class AuthUserMapperService {
     };
   }
 
-  toAuthUser(user: <%_ if (selectedOptionIds.includes('sequelize')) { _%>UserModel<%_ } else { _%>User<%_ } _%>): AuthUserDto {
+  toAuthUser(user: <%_ if (selectedOptionIds.includes('sequelize')) { _%>UserModel<%_ } else if (selectedOptionIds.includes('typeorm')) { _%>UserEntity<%_ } else { _%>User<%_ } _%>): AuthUserDto {
     return {
       id: user.id,
       email: user.email,

@@ -24,7 +24,7 @@ export const usersModulePreset: ModulePresetDefinition<InitPromptData> = {
   id: "users",
   label: "Users Starter Module",
   supportedArchitectures: ["standard", "clean", "ddd"],
-  supportedOrms: ["prisma", "sequelize"],
+  supportedOrms: ["prisma", "typeorm", "sequelize"],
   resolveContribution(input) {
     const { architecture, context } = input;
     const includesAuth = context.has("auth");
@@ -55,6 +55,10 @@ ${includesAuth && !includesRedis ? "\n  refreshSessions RefreshSession[]" : ""}
           `import { UserModel } from './models/user.model';`,
         ],
         "sequelize.models.entries": ["UserModel"],
+        "typeorm.entities.imports": [
+          `import { UserEntity } from './entities/user.entity';`,
+        ],
+        "typeorm.entities.entries": ["UserEntity"],
       },
     };
   },

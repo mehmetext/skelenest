@@ -665,8 +665,8 @@ export class ${names.serviceClassName} {
       : context.orm === "prisma"
         ? `import type { ${names.singularPascal} } from 'src/generated/prisma/client';\n`
         : context.orm === "typeorm"
-          ? `import type { ${names.entityClassName} } from '../../database/entities/${names.singularKebab}.entity';\n`
-          : `import type { ${names.modelClassName} } from '../../database/models/${names.singularKebab}.model';\n`;
+          ? `import type { ${names.entityClassName} } from '../../../database/entities/${names.singularKebab}.entity';\n`
+          : `import type { ${names.modelClassName} } from '../../../database/models/${names.singularKebab}.model';\n`;
 
   return `${typeImport}import { Inject, Injectable } from '@nestjs/common';
 import { ${names.createDtoClassName} } from './dto/create-${names.singularKebab}.dto';
@@ -714,8 +714,8 @@ function buildRepositoryPortFile(
       : context.orm === "prisma"
         ? `import type { ${names.singularPascal} } from 'src/generated/prisma/client';`
         : context.orm === "typeorm"
-          ? `import type { ${names.entityClassName} } from '../../../database/entities/${names.singularKebab}.entity';`
-          : `import type { ${names.modelClassName} } from '../../../database/models/${names.singularKebab}.model';`;
+          ? `import type { ${names.entityClassName} } from '../../../../database/entities/${names.singularKebab}.entity';`
+          : `import type { ${names.modelClassName} } from '../../../../database/models/${names.singularKebab}.model';`;
   const resultType =
     context.architecture === "ddd"
       ? `${names.singularPascal}Entity`
@@ -880,6 +880,12 @@ function buildTypeOrmRepositoryFile(
   names: ResourceNames,
   context: GenerateProjectContext
 ): string {
+  const ormEntityReference =
+    context.architecture === "ddd" ? `${names.entityClassName}Record` : names.entityClassName;
+  const ormEntityImport =
+    context.architecture === "ddd"
+      ? `import { ${names.entityClassName} as ${ormEntityReference} } from '../../../../database/entities/${names.singularKebab}.entity';`
+      : `import { ${names.entityClassName} } from '../../../../database/entities/${names.singularKebab}.entity';`;
   const dddImport =
     context.architecture === "ddd"
       ? `import type { ${names.singularPascal}Entity } from '../../domain/entities/${names.singularKebab}.entity';\n`
@@ -887,7 +893,7 @@ function buildTypeOrmRepositoryFile(
   const mapper =
     context.architecture === "ddd"
       ? `
-function toEntity(record: ${names.entityClassName}): ${names.singularPascal}Entity {
+function toEntity(record: ${ormEntityReference}): ${names.singularPascal}Entity {
   return {
     id: record.id,
     name: record.name,
@@ -907,13 +913,13 @@ import { InjectRepository } from '@nestjs/typeorm';
 import type { ${names.repositoryInterfaceName} } from '../../application/ports/${names.singularKebab}-repository.port';
 import { ${names.createDtoClassName} } from '../../application/dto/create-${names.singularKebab}.dto';
 import { ${names.updateDtoClassName} } from '../../application/dto/update-${names.singularKebab}.dto';
-import { ${names.entityClassName} } from '../../../database/entities/${names.singularKebab}.entity';
+${ormEntityImport}
 ${dddImport}import { Repository } from 'typeorm';
 ${mapper}@Injectable()
 export class TypeOrm${names.pluralPascal}Repository implements ${names.repositoryInterfaceName} {
   constructor(
-    @InjectRepository(${names.entityClassName})
-    private readonly repository: Repository<${names.entityClassName}>,
+    @InjectRepository(${ormEntityReference})
+    private readonly repository: Repository<${ormEntityReference}>,
   ) {}
 
   async findAll(): Promise<${resultType}[]> {
@@ -983,7 +989,7 @@ import { InjectModel } from '@nestjs/sequelize';
 import type { ${names.repositoryInterfaceName} } from '../../application/ports/${names.singularKebab}-repository.port';
 import { ${names.createDtoClassName} } from '../../application/dto/create-${names.singularKebab}.dto';
 import { ${names.updateDtoClassName} } from '../../application/dto/update-${names.singularKebab}.dto';
-import { ${names.modelClassName} } from '../../../database/models/${names.singularKebab}.model';
+import { ${names.modelClassName} } from '../../../../database/models/${names.singularKebab}.model';
 ${dddImport}${mapper}@Injectable()
 export class Sequelize${names.pluralPascal}Repository implements ${names.repositoryInterfaceName} {
   constructor(

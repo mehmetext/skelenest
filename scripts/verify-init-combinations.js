@@ -62,7 +62,7 @@ function getGroup(groupId) {
 }
 
 function expectedToSucceed({ orm, modules }) {
-  return !(modules.includes("auth") && !["prisma", "sequelize"].includes(orm));
+  return !(modules.includes("auth") && !["prisma", "typeorm", "sequelize"].includes(orm));
 }
 
 function createSelectionCases() {
@@ -412,6 +412,47 @@ function verifyAuthVariant(outputRoot, selectionCase) {
     }
   }
 
+  if (selectionCase.orm === "typeorm") {
+    const userEntityPath = path.join(outputRoot, "src", "database", "entities", "user.entity.ts");
+    const refreshEntityPath = path.join(outputRoot, "src", "database", "entities", "refresh-session.entity.ts");
+    const revokedEntityPath = path.join(outputRoot, "src", "database", "entities", "revoked-access-token.entity.ts");
+    const typeOrmConfig = fs.readFileSync(
+      path.join(outputRoot, "src", "database", "typeorm.config.ts"),
+      "utf8"
+    );
+
+    ensure(fs.existsSync(userEntityPath), "typeorm auth scaffold must include UserEntity");
+    ensure(
+      typeOrmConfig.includes("UserEntity"),
+      "typeorm auth scaffold must register UserEntity"
+    );
+
+    if (includesRedis) {
+      ensure(
+        !fs.existsSync(refreshEntityPath),
+        "RefreshSessionEntity must not be generated when redis is selected"
+      );
+      ensure(
+        !fs.existsSync(revokedEntityPath),
+        "RevokedAccessTokenEntity must not be generated when redis is selected"
+      );
+    } else {
+      ensure(
+        fs.existsSync(refreshEntityPath),
+        "RefreshSessionEntity must be generated when redis is not selected"
+      );
+      ensure(
+        fs.existsSync(revokedEntityPath),
+        "RevokedAccessTokenEntity must be generated when redis is not selected"
+      );
+      ensure(
+        typeOrmConfig.includes("RefreshSessionEntity") &&
+          typeOrmConfig.includes("RevokedAccessTokenEntity"),
+        "typeorm auth scaffold must register auth session entities"
+      );
+    }
+  }
+
   if (selectionCase.architecture === "standard") {
     const authServicePath = path.join(outputRoot, "src", "auth", "auth.service.ts");
     const authService = fs.readFileSync(authServicePath, "utf8");
@@ -448,7 +489,7 @@ function verifyAuthVariant(outputRoot, selectionCase) {
         authService.includes("this.prisma.refreshSession"),
         "standard auth must use prisma refresh sessions when redis is not selected"
       );
-    } else {
+    } else if (selectionCase.orm === "sequelize") {
       ensure(
         authService.includes("private readonly refreshSessions: typeof RefreshSessionModel"),
         "standard sequelize auth must inject refresh session model when redis is not selected"
@@ -456,6 +497,15 @@ function verifyAuthVariant(outputRoot, selectionCase) {
       ensure(
         authService.includes("this.refreshSessions"),
         "standard sequelize auth must use sequelize refresh sessions when redis is not selected"
+      );
+    } else {
+      ensure(
+        authService.includes("private readonly refreshSessions: Repository<RefreshSessionEntity>"),
+        "standard typeorm auth must inject refresh session repository when redis is not selected"
+      );
+      ensure(
+        authService.includes("this.refreshSessions"),
+        "standard typeorm auth must use typeorm refresh sessions when redis is not selected"
       );
     }
 
@@ -514,6 +564,12 @@ function verifyAuthVariant(outputRoot, selectionCase) {
     "cache",
     "sequelize-auth-session-store.adapter.ts"
   );
+  const typeOrmAdapterPath = path.join(
+    authBaseDir,
+    "infrastructure",
+    "cache",
+    "typeorm-auth-session-store.adapter.ts"
+  );
 
   if (includesRedis) {
     ensure(
@@ -523,6 +579,10 @@ function verifyAuthVariant(outputRoot, selectionCase) {
     ensure(
       !fs.existsSync(sequelizeAdapterPath),
       `${selectionCase.architecture} auth must not generate sequelize adapter when redis is selected`
+    );
+    ensure(
+      !fs.existsSync(typeOrmAdapterPath),
+      `${selectionCase.architecture} auth must not generate typeorm adapter when redis is selected`
     );
     ensure(
       fs.existsSync(redisAdapterPath),
@@ -542,6 +602,10 @@ function verifyAuthVariant(outputRoot, selectionCase) {
       `${selectionCase.architecture} auth must not generate sequelize adapter for prisma auth`
     );
     ensure(
+      !fs.existsSync(typeOrmAdapterPath),
+      `${selectionCase.architecture} auth must not generate typeorm adapter for prisma auth`
+    );
+    ensure(
       !fs.existsSync(redisAdapterPath),
       `${selectionCase.architecture} auth must not generate redis adapter when redis is not selected`
     );
@@ -549,7 +613,7 @@ function verifyAuthVariant(outputRoot, selectionCase) {
       authModule.includes("useClass: PrismaAuthSessionStoreAdapter"),
       `${selectionCase.architecture} auth must wire PrismaAuthSessionStoreAdapter when redis is not selected`
     );
-  } else {
+  } else if (selectionCase.orm === "sequelize") {
     ensure(
       !fs.existsSync(prismaAdapterPath),
       `${selectionCase.architecture} auth must not generate prisma adapter for sequelize auth`
@@ -565,6 +629,27 @@ function verifyAuthVariant(outputRoot, selectionCase) {
     ensure(
       authModule.includes("useClass: SequelizeAuthSessionStoreAdapter"),
       `${selectionCase.architecture} auth must wire SequelizeAuthSessionStoreAdapter when redis is not selected`
+    );
+  } else {
+    ensure(
+      !fs.existsSync(prismaAdapterPath),
+      `${selectionCase.architecture} auth must not generate prisma adapter for typeorm auth`
+    );
+    ensure(
+      !fs.existsSync(sequelizeAdapterPath),
+      `${selectionCase.architecture} auth must not generate sequelize adapter for typeorm auth`
+    );
+    ensure(
+      fs.existsSync(typeOrmAdapterPath),
+      `${selectionCase.architecture} auth must generate typeorm adapter when redis is not selected`
+    );
+    ensure(
+      !fs.existsSync(redisAdapterPath),
+      `${selectionCase.architecture} auth must not generate redis adapter when redis is not selected`
+    );
+    ensure(
+      authModule.includes("useClass: TypeOrmAuthSessionStoreAdapter"),
+      `${selectionCase.architecture} auth must wire TypeOrmAuthSessionStoreAdapter when redis is not selected`
     );
   }
 

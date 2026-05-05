@@ -1,0 +1,16 @@
+import type { UserEntity } from '../../../../database/entities/user.entity';
+
+export interface CreateUserInput {
+  email: string;
+  passwordHash: string;
+  firstName?: string | null;
+  lastName?: string | null;
+}
+
+export interface UsersRepository {
+  findById(id: string): Promise<UserEntity | null>;
+  findByEmail(email: string): Promise<UserEntity | null>;
+  create(input: CreateUserInput): Promise<UserEntity>;
+}
+
+export const USERS_REPOSITORY = Symbol('USERS_REPOSITORY');
