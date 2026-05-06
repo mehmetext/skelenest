@@ -17,7 +17,10 @@ import { Module } from '@nestjs/common';
 import { ConfigModule<% if (includesRedis || includesBullmq || includesThrottler || includesElasticsearch) { %>, ConfigService<% } %> } from '@nestjs/config';
 <%_ if (includesThrottler) { _%>
 import { APP_GUARD } from '@nestjs/core';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule<% if (!includesGraphql) { %>, ThrottlerGuard<% } %> } from '@nestjs/throttler';
+<%_ if (includesGraphql) { _%>
+import { GqlThrottlerGuard } from './common/guards/gql-throttler.guard';
+<%_ } _%>
 <%_ } _%>
 <%
 const appModuleImports = getSlot('app.module.imports');
@@ -107,7 +110,7 @@ import { AppService } from './app.service';
 <%_ if (includesThrottler) { _%>
     {
       provide: APP_GUARD,
-      useClass: ThrottlerGuard,
+      useClass: <%= includesGraphql ? 'GqlThrottlerGuard' : 'ThrottlerGuard' %>,
     },
 <%_ } _%>
   ],
