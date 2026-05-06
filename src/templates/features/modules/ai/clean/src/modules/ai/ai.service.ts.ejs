@@ -1,0 +1,35 @@
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import type { ModelMessage } from 'ai';
+import { AI_OPTIONS } from './constants';
+import type { AiModuleOptions } from './interfaces';
+import type { HelloWorldResult } from './operations/hello-world';
+import { helloWorld } from './operations/hello-world';
+import { ProviderRegistry } from './provider-registry';
+
+type SharedSettings = {
+  maxOutputTokens?: number;
+  temperature?: number;
+  topP?: number;
+};
+
+export type TextInput =
+  | (SharedSettings & {
+      prompt: string | Array<ModelMessage>;
+      messages?: never;
+    })
+  | (SharedSettings & { messages: Array<ModelMessage>; prompt?: never });
+
+@Injectable()
+export class AiService {
+  private readonly logger = new Logger(AiService.name);
+  private readonly registry: ProviderRegistry;
+
+  constructor(@Inject(AI_OPTIONS) options: AiModuleOptions) {
+    this.registry = new ProviderRegistry(options.apiKeys);
+  }
+
+  helloWorld(name: string): Promise<HelloWorldResult> {
+    this.logger.log(`Generating hello world message for ${name}`);
+    return helloWorld(this.registry, name);
+  }
+}

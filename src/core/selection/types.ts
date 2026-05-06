@@ -16,6 +16,7 @@ export interface TechnologyOption<TContext> {
   label: string;
   description?: string;
   supportedOrms?: string[];
+  supportedArchitectures?: string[];
   requires?: string[];
   conflictsWith?: string[];
   contribute(context: SelectionResolutionContext<TContext>): ScaffoldingContribution;

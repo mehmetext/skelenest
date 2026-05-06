@@ -1,0 +1,35 @@
+import { DynamicModule, Module } from '@nestjs/common';
+import { AI_OPTIONS } from './constants';
+import type { AiModuleAsyncOptions, AiModuleOptions } from './interfaces';
+import { AiService } from './ai.service';
+
+@Module({})
+export class AiModule {
+  static forRoot(options: AiModuleOptions): DynamicModule {
+    return {
+      module: AiModule,
+      global: true,
+      providers: [{ provide: AI_OPTIONS, useValue: options }, AiService],
+      exports: [AiService],
+    };
+  }
+
+  static forRootAsync<TArgs extends unknown[]>(
+    options: AiModuleAsyncOptions<TArgs>
+  ): DynamicModule {
+    return {
+      module: AiModule,
+      global: true,
+      imports: options.imports ?? [],
+      providers: [
+        {
+          provide: AI_OPTIONS,
+          inject: options.inject ?? [],
+          useFactory: options.useFactory,
+        },
+        AiService,
+      ],
+      exports: [AiService],
+    };
+  }
+}

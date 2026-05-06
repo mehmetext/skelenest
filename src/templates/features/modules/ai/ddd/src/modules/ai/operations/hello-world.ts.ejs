@@ -1,0 +1,32 @@
+import { Output, generateText } from 'ai';
+import z from 'zod';
+import type { ProviderRegistry } from '../provider-registry';
+
+const helloWorldSchema = z.object({
+  message: z.string(),
+  language: z.string(),
+  funFact: z.string(),
+});
+
+export type HelloWorldResult = z.infer<typeof helloWorldSchema>;
+
+export async function helloWorld(
+  registry: ProviderRegistry,
+  name: string
+): Promise<HelloWorldResult> {
+  const { output } = await generateText({
+    model: registry.getModel('simple'),
+    output: Output.object({ schema: helloWorldSchema }),
+    system: 'You are a friendly assistant that greets people in creative ways.',
+    messages: [
+      {
+        role: 'user',
+        content:
+          `Say hello to "${name}" in a random language. ` +
+          'Include the greeting message, the language name in English, and a fun fact about that language.',
+      },
+    ],
+  });
+
+  return output;
+}

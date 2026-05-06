@@ -1,0 +1,39 @@
+import type { LanguageModel } from 'ai';
+import { AI_MODELS, type ModelAlias, type ProviderName } from './models';
+import type { AiProvider } from './interfaces';
+<%_ for (const provider of aiProviders) { _%>
+import { <%= provider.className %> } from '<%= provider.importPath %>';
+<%_ } _%>
+
+const CREATORS: Record<ProviderName, (apiKey: string) => AiProvider> = {
+<%_ for (const provider of aiProviders) { _%>
+  <%= provider.id %>: (key) => new <%= provider.className %>(key),
+<%_ } _%>
+};
+
+export class ProviderRegistry {
+  private readonly providerCache = new Map<ProviderName, AiProvider>();
+  private readonly modelCache = new Map<ModelAlias, LanguageModel>();
+
+  constructor(private readonly apiKeys: Record<ProviderName, string>) {}
+
+  getModel(alias: ModelAlias): LanguageModel {
+    const cached = this.modelCache.get(alias);
+    if (cached) return cached;
+
+    const raw = AI_MODELS[alias];
+    const sep = raw.indexOf(':');
+    const providerName = raw.slice(0, sep) as ProviderName;
+    const modelId = raw.slice(sep + 1);
+
+    let provider = this.providerCache.get(providerName);
+    if (!provider) {
+      provider = CREATORS[providerName](this.apiKeys[providerName]);
+      this.providerCache.set(providerName, provider);
+    }
+
+    const model = provider.getModel(modelId);
+    this.modelCache.set(alias, model);
+    return model;
+  }
+}

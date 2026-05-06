@@ -2,7 +2,7 @@ import { ScaffoldingContribution } from "../../blueprints/types";
 import { SelectionResolutionContext } from "../../selection/types";
 
 export type ArchitectureId = "standard" | "clean" | "ddd";
-export type ModulePresetId = "auth" | "users";
+export type ModulePresetId = "ai" | "auth" | "users";
 export type OrmId = "prisma" | "typeorm" | "sequelize" | "none";
 
 export interface ModulePresetDefinition<TContext> {

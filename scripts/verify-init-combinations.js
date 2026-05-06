@@ -61,7 +61,7 @@ function getGroup(groupId) {
   return group;
 }
 
-function expectedToSucceed({ orm, modules }) {
+function expectedToSucceed({ orm, architecture, modules }) {
   return !(modules.includes("auth") && !["prisma", "typeorm", "sequelize"].includes(orm));
 }
 
@@ -368,6 +368,83 @@ function verifyOptionalFeatureLeakage(blueprint, selectionCase) {
     ensure(
       !packageJson.dependencies["@sentry/nestjs"],
       "@sentry/nestjs should not be present when sentry is not selected"
+    );
+  }
+
+  if (!selectedOptionIds.has("ai")) {
+    ensure(!packageJson.dependencies.ai, "ai package should not be present when ai module is not selected");
+    ensure(!packageJson.dependencies.zod, "zod package should not be present when ai module is not selected");
+    ensure(
+      !packageJson.dependencies["@ai-sdk/google"],
+      "@ai-sdk/google should not be present when ai module is not selected"
+    );
+    ensure(
+      !packageJson.dependencies["@ai-sdk/openai"],
+      "@ai-sdk/openai should not be present when ai module is not selected"
+    );
+    ensure(
+      !packageJson.dependencies["@openrouter/ai-sdk-provider"],
+      "@openrouter/ai-sdk-provider should not be present when ai module is not selected"
+    );
+  }
+}
+
+function verifyAiVariant(outputRoot, selectionCase) {
+  if (!selectionCase.modules.includes("ai")) {
+    return;
+  }
+
+  const effectiveOptionIds = new Set(
+    Array.isArray(selectionCase.selectedOptionIds)
+      ? selectionCase.selectedOptionIds
+      : []
+  );
+  const resolvedAiRoot =
+    selectionCase.architecture === "standard"
+      ? path.join(outputRoot, "src", "ai")
+      : path.join(outputRoot, "src", "modules", "ai");
+  const appModule = fs.readFileSync(path.join(outputRoot, "src", "app.module.ts"), "utf8");
+  const packageJson = JSON.parse(
+    fs.readFileSync(path.join(outputRoot, "package.json"), "utf8")
+  );
+
+  ensure(fs.existsSync(path.join(resolvedAiRoot, "ai.module.ts")), "ai.module.ts must be generated when ai is selected");
+  ensure(fs.existsSync(path.join(resolvedAiRoot, "ai.service.ts")), "ai.service.ts must be generated when ai is selected");
+  ensure(fs.existsSync(path.join(resolvedAiRoot, "provider-registry.ts")), "provider-registry.ts must be generated when ai is selected");
+  ensure(appModule.includes("AiModule.forRootAsync("), "AppModule must register AiModule when ai is selected");
+  ensure(packageJson.dependencies.ai, "ai dependency must be present when ai is selected");
+  ensure(packageJson.dependencies.zod, "zod dependency must be present when ai is selected");
+
+  if (effectiveOptionIds.has("ai-provider-openrouter")) {
+    ensure(
+      fs.existsSync(path.join(resolvedAiRoot, "providers", "openrouter.provider.ts")),
+      "openrouter provider file must be generated when openrouter is selected"
+    );
+    ensure(
+      packageJson.dependencies["@openrouter/ai-sdk-provider"],
+      "@openrouter/ai-sdk-provider must be present when openrouter is selected"
+    );
+  }
+
+  if (effectiveOptionIds.has("ai-provider-google")) {
+    ensure(
+      fs.existsSync(path.join(resolvedAiRoot, "providers", "google.provider.ts")),
+      "google provider file must be generated when google is selected"
+    );
+    ensure(
+      packageJson.dependencies["@ai-sdk/google"],
+      "@ai-sdk/google must be present when google is selected"
+    );
+  }
+
+  if (effectiveOptionIds.has("ai-provider-openai")) {
+    ensure(
+      fs.existsSync(path.join(resolvedAiRoot, "providers", "openai.provider.ts")),
+      "openai provider file must be generated when openai is selected"
+    );
+    ensure(
+      packageJson.dependencies["@ai-sdk/openai"],
+      "@ai-sdk/openai must be present when openai is selected"
     );
   }
 }
@@ -845,6 +922,7 @@ async function verifySuccessfulCase(selectionCase, options = {}) {
 
     verifyGeneratedTree(outputRoot);
     verifyAuthVariant(outputRoot, effectiveSelectionCase);
+    verifyAiVariant(outputRoot, effectiveSelectionCase);
     verifyScheduleVariant(outputRoot, effectiveSelectionCase);
     verifySentryVariant(outputRoot, effectiveSelectionCase);
 
@@ -876,7 +954,8 @@ async function verifyFailureCase(selectionCase, options = {}) {
     `Expected case to fail but it succeeded: ${JSON.stringify(selectionCase)}`
   );
   ensure(
-    thrownError.message.includes('does not support ORM'),
+    thrownError.message.includes('does not support ORM') ||
+      thrownError.message.includes('does not support architecture'),
     `Unexpected failure reason for ${JSON.stringify(selectionCase)}: ${thrownError.message}`
   );
 

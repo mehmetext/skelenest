@@ -136,8 +136,14 @@ function buildTemplateOptionIds(input: {
   selectedOptionIds: string[];
   apiTransports: ApiTransport[];
   starterModuleTransports: Partial<Record<string, ApiTransport[]>>;
+  starterModuleProviders: Partial<Record<string, string[]>>;
 }): string[] {
-  const { selectedOptionIds, apiTransports, starterModuleTransports } = input;
+  const {
+    selectedOptionIds,
+    apiTransports,
+    starterModuleTransports,
+    starterModuleProviders,
+  } = input;
   const optionIds = new Set<string>(selectedOptionIds);
 
   for (const transport of apiTransports) {
@@ -147,6 +153,12 @@ function buildTemplateOptionIds(input: {
   for (const [moduleId, transports] of Object.entries(starterModuleTransports)) {
     for (const transport of transports ?? []) {
       optionIds.add(`${moduleId}-${transport}`);
+    }
+  }
+
+  for (const [moduleId, providers] of Object.entries(starterModuleProviders)) {
+    for (const provider of providers ?? []) {
+      optionIds.add(`${moduleId}-provider-${provider}`);
     }
   }
 
@@ -171,6 +183,7 @@ export function createInitBlueprint(
   const projectDisplayName = formatProjectDisplayName(data.name);
   const helloMessage = `Welcome to ${projectDisplayName}!`;
   const starterModuleTransports = data.starterModuleTransports ?? {};
+  const starterModuleProviders = data.starterModuleProviders ?? {};
   const selectionState = resolveSelectionState({
     selectionGroups: initSelectionGroups,
     selections: data.selections,
@@ -179,6 +192,7 @@ export function createInitBlueprint(
     selectedOptionIds: selectionState.selectedOptionIds,
     apiTransports,
     starterModuleTransports,
+    starterModuleProviders,
   });
 
   const baseContribution: ScaffoldingContribution = {
@@ -198,6 +212,7 @@ export function createInitBlueprint(
       selectedOptionIds: templateOptionIds,
       apiTransports,
       starterModuleTransports,
+      starterModuleProviders,
     },
   };
 

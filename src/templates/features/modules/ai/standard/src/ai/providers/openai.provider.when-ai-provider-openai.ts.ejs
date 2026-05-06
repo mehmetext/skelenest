@@ -1,0 +1,15 @@
+import { createOpenAI } from '@ai-sdk/openai';
+import type { LanguageModel } from 'ai';
+import type { AiProvider } from '../interfaces';
+
+export class OpenAIProvider implements AiProvider {
+  private readonly client: ReturnType<typeof createOpenAI>;
+
+  constructor(apiKey: string) {
+    this.client = createOpenAI({ apiKey });
+  }
+
+  getModel(modelId: string): LanguageModel {
+    return this.client(modelId);
+  }
+}

@@ -11,7 +11,7 @@ It covers the first project bootstrap, architecture-aware code generation inside
 - Creates a new NestJS project in a new directory
 - Lets you choose a package manager: `npm`, `pnpm`, or `yarn`
 - Lets you choose an ORM: `Prisma`, `TypeORM`, `Sequelize`, or none
-- Lets you enable optional features such as `Docker`, `Redis`, `BullMQ`, `Swagger`, `Throttler`, `Task Scheduling`, and an auth starter
+- Lets you enable optional features such as `Docker`, `Redis`, `BullMQ`, `Swagger`, `Throttler`, and `Task Scheduling`, plus starter modules like auth and AI
 - Generates modules, CRUD resources, DTOs, and use cases inside an existing Skelenest project
 - Verifies generated projects with `doctor`, including stack wiring, required files, scripts, and selected feature checks
 - Sets up request validation defaults with Nest's global `ValidationPipe`
@@ -60,10 +60,11 @@ skelenest init \
   --name my-api \
   --port 3000 \
   --package-manager pnpm \
-  --orm prisma \
-  --architecture clean \
-  --features swagger,bullmq,schedule \
-  --modules auth \
+  --orm none \
+  --architecture standard \
+  --features swagger \
+  --modules ai \
+  --ai-providers openrouter,google \
   --no-install \
   --no-git
 ```
@@ -85,6 +86,7 @@ You will be prompted for:
 - Architecture style
 - Optional features
 - Starter modules
+- Starter module follow-up choices such as auth transports or AI providers
 - Whether dependencies should be installed automatically
 - Whether git should be initialized with a first commit
 
@@ -177,6 +179,7 @@ clean-api/
 - `Swagger`
 - `Task Scheduling`
 - `Auth Starter Module`
+- `Starter AI Module` for `standard` architecture
 
 Some options are dependency-aware. For example, selecting `BullMQ` automatically pulls in the Redis stack.
 
@@ -193,6 +196,7 @@ Some options are dependency-aware. For example, selecting `BullMQ` automatically
 | `--features schedule` | `schedule` | Adds `ScheduleModule.forRoot()` and an example cron job service |
 | `--features docker` | `docker` | Adds `Dockerfile`, `.dockerignore`, and `docker-compose.yml` |
 | `--modules auth` | `auth` | Adds auth and users starter modules tailored to the selected architecture; supported with Prisma, TypeORM, or Sequelize |
+| `--modules ai --ai-providers openrouter,google` | `ai` | Adds a reusable AI module, wires `AiModule.forRootAsync(...)`, adds AI SDK dependencies, and only includes the selected providers. In `standard` it lives under `src/ai`; in `clean` and `ddd` it lives under `src/modules/ai` |
 
 ## Generation model
 

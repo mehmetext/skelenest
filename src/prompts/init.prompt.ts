@@ -13,6 +13,7 @@ import { PackageManager, packageManagers } from "../data";
 import { ApiTransport } from "../generate/types";
 import {
   initSelectionGroups,
+  AiProviderOption,
   InitPromptData,
   InitPromptOverrides,
 } from "../init";
@@ -183,6 +184,61 @@ function validateModuleSupport(orm: string, modules: string[]): void {
   }
 }
 
+function validateModuleArchitectureSupport(
+  architecture: string,
+  modules: string[]
+): void {
+  const modulesGroup = findGroup("modules");
+
+  for (const moduleId of modules) {
+    const option = modulesGroup.options.find((entry) => entry.id === moduleId);
+
+    if (!option) {
+      continue;
+    }
+
+    if (
+      option.supportedArchitectures &&
+      !option.supportedArchitectures.includes(architecture)
+    ) {
+      throw new Error(
+        `Starter module "${moduleId}" supports only: ${option.supportedArchitectures.join(
+          ", "
+        )}. Current architecture: ${architecture}.`
+      );
+    }
+  }
+}
+
+function normalizeAiProviders(
+  values: string[] | undefined
+): AiProviderOption[] | undefined {
+  if (values === undefined) {
+    return undefined;
+  }
+
+  const allowedValues: AiProviderOption[] = ["openrouter", "google", "openai"];
+  const normalizedValues = Array.from(
+    new Set(values.map((value) => value.trim().toLowerCase()).filter(Boolean))
+  );
+
+  if (normalizedValues.length === 0) {
+    throw new Error("At least one AI provider must be selected.");
+  }
+
+  for (const value of normalizedValues) {
+    if (!allowedValues.includes(value as AiProviderOption)) {
+      throw new Error(
+        `Unsupported AI provider "${value}". Expected one of: ${allowedValues.join(
+          ", "
+        )}.`
+      );
+    }
+  }
+
+  return normalizedValues as AiProviderOption[];
+}
+
 export class InitPrompt extends BasePrompt<InitPromptData> {
   constructor() {
     super();
@@ -239,6 +295,9 @@ export class InitPrompt extends BasePrompt<InitPromptData> {
     const initialModules = normalizeMultiSelection(
       "modules",
       overrideModuleValues
+    );
+    const initialAiProviders = normalizeAiProviders(
+      overrides.starterModuleProviders?.ai
     );
 
     const name =
@@ -385,14 +444,20 @@ export class InitPrompt extends BasePrompt<InitPromptData> {
           : undefined,
         options: modulesGroup.options.map((option) => {
           const isSupported =
-            !option.supportedOrms || option.supportedOrms.includes(orm);
+            (!option.supportedOrms || option.supportedOrms.includes(orm)) &&
+            (!option.supportedArchitectures ||
+              option.supportedArchitectures.includes(architecture));
+          const unsupportedReason = option.supportedArchitectures &&
+            !option.supportedArchitectures.includes(architecture)
+              ? `Currently supported only with ${option.supportedArchitectures.join(", ")} architecture`
+              : `Currently supported only with ${option.supportedOrms?.join(", ")}`;
 
           return {
             value: option.id,
             label: option.label,
             hint: isSupported
               ? option.description
-              : `Currently supported only with ${option.supportedOrms?.join(", ")}`,
+              : unsupportedReason,
             disabled: !isSupported,
           };
         }),
@@ -407,8 +472,10 @@ export class InitPrompt extends BasePrompt<InitPromptData> {
         : modules;
 
     validateModuleSupport(orm, resolvedModules);
+    validateModuleArchitectureSupport(architecture, resolvedModules);
 
     const starterModuleTransports: Partial<Record<string, ApiTransport[]>> = {};
+    const starterModuleProviders: Partial<Record<string, string[]>> = {};
 
     if (resolvedModules.includes("auth")) {
       starterModuleTransports.auth =
@@ -435,6 +502,41 @@ export class InitPrompt extends BasePrompt<InitPromptData> {
       }
     }
 
+    if (resolvedModules.includes("ai")) {
+      starterModuleProviders.ai =
+        initialAiProviders ??
+        (!process.stdin.isTTY
+          ? ["openrouter", "google", "openai"]
+          : ((await multiselect({
+              message: "Which AI providers should the AI module support?",
+              required: true,
+              initialValues: ["openrouter", "google", "openai"],
+              options: [
+                {
+                  value: "openrouter",
+                  label: "OpenRouter",
+                  hint: "Adds the OpenRouter provider and API key wiring",
+                },
+                {
+                  value: "google",
+                  label: "Gemini",
+                  hint: "Adds the Google Gemini provider and API key wiring",
+                },
+                {
+                  value: "openai",
+                  label: "OpenAI",
+                  hint: "Adds the OpenAI provider and API key wiring",
+                },
+              ],
+            })) as AiProviderOption[]));
+
+      if (isCancel(starterModuleProviders.ai)) onCancel();
+
+      if (!starterModuleProviders.ai?.length) {
+        throw new Error("AI module must support at least one provider.");
+      }
+    }
+
     const installDependencies =
       overrides.installDependencies ??
       ((await confirm({
@@ -457,6 +559,7 @@ export class InitPrompt extends BasePrompt<InitPromptData> {
       packageManager,
       apiTransports,
       starterModuleTransports,
+      starterModuleProviders,
       installDependencies,
       initializeGit,
       selections: {

@@ -15,6 +15,7 @@ interface InitCommandOptions {
   port?: string;
   packageManager?: "npm" | "pnpm" | "yarn";
   transports?: string[];
+  aiProviders?: string[];
   orm?: string;
   architecture?: string;
   features?: string[];
@@ -39,6 +40,11 @@ export class InitCommand extends BaseCommand {
     this.option(
       "--transports <transports>",
       "Comma-separated API transports: rest, graphql",
+      parseListOption
+    );
+    this.option(
+      "--ai-providers <providers>",
+      "Comma-separated AI providers for the AI starter module: openrouter, google, openai",
       parseListOption
     );
     this.option(
@@ -95,6 +101,9 @@ export class InitCommand extends BaseCommand {
       port: options.port,
       packageManager: options.packageManager,
       apiTransports: options.transports as ("rest" | "graphql")[] | undefined,
+      starterModuleProviders: options.aiProviders
+        ? { ai: options.aiProviders }
+        : undefined,
       installDependencies: options.install,
       initializeGit: options.git,
       selections,

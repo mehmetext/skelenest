@@ -1,0 +1,21 @@
+import type {
+  InjectionToken,
+  ModuleMetadata,
+  OptionalFactoryDependency,
+} from '@nestjs/common';
+import type { LanguageModel } from 'ai';
+import type { ProviderName } from './models';
+
+export interface AiProvider {
+  getModel(modelId: string): LanguageModel;
+}
+
+export interface AiModuleOptions {
+  apiKeys: Record<ProviderName, string>;
+}
+
+export interface AiModuleAsyncOptions<TArgs extends unknown[] = unknown[]>
+  extends Pick<ModuleMetadata, 'imports'> {
+  inject?: (InjectionToken | OptionalFactoryDependency)[];
+  useFactory: (...args: TArgs) => Promise<AiModuleOptions> | AiModuleOptions;
+}

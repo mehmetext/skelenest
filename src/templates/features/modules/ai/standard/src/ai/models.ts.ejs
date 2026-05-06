@@ -1,0 +1,10 @@
+export const AI_MODELS = {
+  simple: '<%= aiModels.simple %>',
+  complex: '<%= aiModels.complex %>',
+} as const;
+
+export type ModelAlias = keyof typeof AI_MODELS;
+
+type ModelValue = (typeof AI_MODELS)[ModelAlias];
+
+export type ProviderName = ModelValue extends `${infer P}:${string}` ? P : never;

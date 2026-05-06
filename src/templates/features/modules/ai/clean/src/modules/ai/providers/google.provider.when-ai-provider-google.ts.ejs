@@ -1,0 +1,15 @@
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
+import type { LanguageModel } from 'ai';
+import type { AiProvider } from '../interfaces';
+
+export class GoogleProvider implements AiProvider {
+  private readonly client: ReturnType<typeof createGoogleGenerativeAI>;
+
+  constructor(apiKey: string) {
+    this.client = createGoogleGenerativeAI({ apiKey });
+  }
+
+  getModel(modelId: string): LanguageModel {
+    return this.client(modelId);
+  }
+}

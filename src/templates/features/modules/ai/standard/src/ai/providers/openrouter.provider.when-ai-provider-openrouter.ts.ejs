@@ -1,0 +1,15 @@
+import { createOpenRouter } from '@openrouter/ai-sdk-provider';
+import type { LanguageModel } from 'ai';
+import type { AiProvider } from '../interfaces';
+
+export class OpenRouterProvider implements AiProvider {
+  private readonly client: ReturnType<typeof createOpenRouter>;
+
+  constructor(apiKey: string) {
+    this.client = createOpenRouter({ apiKey });
+  }
+
+  getModel(modelId: string): LanguageModel {
+    return this.client(modelId);
+  }
+}
