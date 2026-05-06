@@ -291,6 +291,26 @@ function verifyFeatureDependencies(blueprint, selectionCase) {
     );
   }
 
+  if (selectionCase.features.includes("sentry")) {
+    ensure(
+      packageJson.dependencies["@sentry/nestjs"],
+      "@sentry/nestjs dependency missing when sentry is selected"
+    );
+    ensure(
+      envEntries.some((entry) => entry.startsWith('SENTRY_DSN=')),
+      "SENTRY_DSN must be present when sentry is selected"
+    );
+    ensure(
+      envEntries.some((entry) => entry.startsWith('SENTRY_TRACES_SAMPLE_RATE=')),
+      "SENTRY_TRACES_SAMPLE_RATE must be present when sentry is selected"
+    );
+  } else {
+    ensure(
+      !envEntries.some((entry) => entry.startsWith("SENTRY_")),
+      "SENTRY_* env entries should not be present without sentry"
+    );
+  }
+
   if (selectionCase.orm === "none") {
     ensure(
       !envEntries.some((entry) => entry.startsWith('DATABASE_URL=')),
@@ -341,6 +361,13 @@ function verifyOptionalFeatureLeakage(blueprint, selectionCase) {
     ensure(
       !packageJson.dependencies["@nestjs/schedule"],
       "@nestjs/schedule should not be present when schedule is not selected"
+    );
+  }
+
+  if (!selectedOptionIds.has("sentry")) {
+    ensure(
+      !packageJson.dependencies["@sentry/nestjs"],
+      "@sentry/nestjs should not be present when sentry is not selected"
     );
   }
 }
@@ -732,6 +759,60 @@ function verifyScheduleVariant(outputRoot, selectionCase) {
   }
 }
 
+function verifySentryVariant(outputRoot, selectionCase) {
+  const includesSentry = Array.isArray(selectionCase.selectedOptionIds)
+    ? selectionCase.selectedOptionIds.includes("sentry")
+    : false;
+  const instrumentPath = path.join(outputRoot, "src", "instrument.ts");
+  const mainPath = path.join(outputRoot, "src", "main.ts");
+  const appModulePath = path.join(outputRoot, "src", "app.module.ts");
+  const main = fs.readFileSync(mainPath, "utf8");
+  const appModule = fs.readFileSync(appModulePath, "utf8");
+
+  if (includesSentry) {
+    ensure(
+      fs.existsSync(instrumentPath),
+      "instrument.ts must be generated when sentry is selected"
+    );
+
+    const instrument = fs.readFileSync(instrumentPath, "utf8");
+
+    ensure(
+      main.startsWith("import './instrument';"),
+      "main.ts must import ./instrument first when sentry is selected"
+    );
+    ensure(
+      instrument.includes('import * as Sentry from "@sentry/nestjs";'),
+      "instrument.ts must import the Sentry SDK"
+    );
+    ensure(
+      instrument.includes("Sentry.init("),
+      "instrument.ts must initialize Sentry"
+    );
+    ensure(
+      appModule.includes("SentryModule.forRoot()"),
+      "AppModule must register SentryModule when sentry is selected"
+    );
+    ensure(
+      appModule.includes("SentryGlobalFilter"),
+      "AppModule must register SentryGlobalFilter when sentry is selected"
+    );
+  } else {
+    ensure(
+      !fs.existsSync(instrumentPath),
+      "instrument.ts must not be generated when sentry is not selected"
+    );
+    ensure(
+      !main.includes("import './instrument';"),
+      "main.ts must not import ./instrument when sentry is not selected"
+    );
+    ensure(
+      !appModule.includes("SentryModule.forRoot()"),
+      "AppModule must not register SentryModule when sentry is not selected"
+    );
+  }
+}
+
 async function verifySuccessfulCase(selectionCase, options = {}) {
   const blueprint = createInitBlueprint(createPromptData(selectionCase));
   verifyFeatureDependencies(blueprint, selectionCase);
@@ -765,6 +846,7 @@ async function verifySuccessfulCase(selectionCase, options = {}) {
     verifyGeneratedTree(outputRoot);
     verifyAuthVariant(outputRoot, effectiveSelectionCase);
     verifyScheduleVariant(outputRoot, effectiveSelectionCase);
+    verifySentryVariant(outputRoot, effectiveSelectionCase);
 
     if (options.outputDir) {
       writeArtifactCase(options.outputDir, selectionCase, {

@@ -151,6 +151,15 @@ Sequelize is the selected ORM.
 <%_ } else { _%>
 - Task Scheduling is not selected. Do not add `@nestjs/schedule`, cron decorators, or scheduler bootstrap code unless requested.
 <%_ } _%>
+<%_ if (selectedOptionIds.includes('sentry')) { _%>
+- Sentry is selected. Keep `src/instrument.ts`, `main.ts`, and `AppModule` wiring consistent with the generated Sentry bootstrap flow.
+- `main.ts` must import `./instrument` before any Nest imports so Sentry instrumentation initializes first.
+- Keep `SentryModule.forRoot()` and `SentryGlobalFilter` registered unless the user explicitly wants a different Sentry integration strategy.
+- Use `SENTRY_DSN` and `SENTRY_TRACES_SAMPLE_RATE` from `.env`; do not hardcode DSNs or environment-specific secrets in source files.
+- When adding catch-all exception filters, ensure Sentry reporting still happens, either by keeping the generated global filter or following the NestJS Sentry recipe for custom filters.
+<%_ } else { _%>
+- Sentry is not selected. Do not add `@sentry/nestjs`, bootstrap instrumentation, `SentryGlobalFilter`, or `SENTRY_*` environment variables unless requested.
+<%_ } _%>
 <%_ if (selectedOptionIds.includes('elasticsearch')) { _%>
 - Elasticsearch is selected. Use the existing `ElasticsearchModule` wiring and `ELASTICSEARCH_*` configuration.
 - Keep index names, mappings, and search DTOs explicit and close to the feature that owns them.

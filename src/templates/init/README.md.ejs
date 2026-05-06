@@ -78,6 +78,14 @@ An example cron job lives in `src/tasks/tasks.service.ts` and is registered thro
 Start the app in watch mode and replace the sample handler with your own recurring jobs, intervals, or timeouts as needed.
 <%_ } _%>
 
+<%_ if (selectedOptionIds.includes('sentry')) { _%>
+## Sentry
+
+This project includes Sentry bootstrap wiring based on the official NestJS recipe.
+
+Set `SENTRY_DSN` in `.env` before enabling it in a real environment. The generated `src/instrument.ts` file initializes the SDK before the Nest application boots, and `AppModule` registers `SentryModule.forRoot()` with `SentryGlobalFilter` so unhandled exceptions are reported automatically.
+<%_ } _%>
+
 ## Deployment
 
 When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.

@@ -534,6 +534,64 @@ async function checkFeatures(context: DoctorContext): Promise<DoctorFinding[]> {
     }
   }
 
+  if (context.features.has("sentry")) {
+    if ("SENTRY_DSN" in context.env) {
+      pushFinding(findings, "ok", "SENTRY_DSN found", ".env contains SENTRY_DSN.");
+    } else {
+      pushFinding(findings, "error", "SENTRY_DSN missing", ".env should define SENTRY_DSN when Sentry is selected.");
+    }
+
+    if (hasDependency(context, "@sentry/nestjs")) {
+      pushFinding(findings, "ok", "Sentry dependency found", "@sentry/nestjs is installed.");
+    } else {
+      pushFinding(findings, "error", "Sentry dependency missing", "@sentry/nestjs should be present when Sentry is selected.");
+    }
+
+    if (await pathExists(context.cwd, "src/instrument.ts")) {
+      pushFinding(findings, "ok", "Sentry instrument file found", "src/instrument.ts exists.");
+    } else {
+      pushFinding(findings, "error", "Sentry instrument file missing", "src/instrument.ts should exist when Sentry is selected.");
+    }
+
+    if (context.mainContent.includes("import './instrument';")) {
+      pushFinding(findings, "ok", "Sentry bootstrap import found", "main.ts imports ./instrument before bootstrapping Nest.");
+    } else {
+      pushFinding(findings, "error", "Sentry bootstrap import missing", "main.ts should import ./instrument when Sentry is selected.");
+    }
+
+    if (context.appModuleContent.includes("SentryModule.forRoot()")) {
+      pushFinding(findings, "ok", "Sentry module wiring found", "AppModule configures SentryModule.forRoot().");
+    } else {
+      pushFinding(findings, "error", "Sentry module wiring missing", "AppModule should configure SentryModule.forRoot() when Sentry is selected.");
+    }
+
+    if (context.appModuleContent.includes("SentryGlobalFilter")) {
+      pushFinding(findings, "ok", "Sentry global filter found", "AppModule registers SentryGlobalFilter.");
+    } else {
+      pushFinding(findings, "error", "Sentry global filter missing", "AppModule should register SentryGlobalFilter when Sentry is selected.");
+    }
+  } else {
+    const sentryLeakSignals = [
+      "SENTRY_DSN" in context.env,
+      hasDependency(context, "@sentry/nestjs"),
+      await pathExists(context.cwd, "src/instrument.ts"),
+      context.mainContent.includes("import './instrument';"),
+      context.appModuleContent.includes("SentryModule.forRoot()"),
+      context.appModuleContent.includes("SentryGlobalFilter"),
+    ];
+
+    if (sentryLeakSignals.some(Boolean)) {
+      pushFinding(
+        findings,
+        "warn",
+        "Unexpected Sentry wiring",
+        "Sentry is not selected, but Sentry env/config/dependencies were still detected."
+      );
+    } else {
+      pushFinding(findings, "ok", "No Sentry leakage", "Sentry-only wiring is absent as expected.");
+    }
+  }
+
   if (context.features.has("elasticsearch")) {
     for (const key of [
       "ELASTICSEARCH_NODE",

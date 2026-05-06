@@ -1,3 +1,10 @@
+<%
+const mainPreImports = getSlot('main.preImports');
+-%>
+<%_ if (mainPreImports.length > 0) { _%>
+<%- mainPreImports.join('\n') %>
+
+<%_ } _%>
 import { ValidationPipe } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 <%_ const includesSwagger = selectedOptionIds.includes('swagger'); _%>

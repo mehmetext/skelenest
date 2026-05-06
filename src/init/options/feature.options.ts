@@ -95,6 +95,34 @@ export const featureOptions: TechnologyOption<InitPromptData>[] = [
     }),
   },
   {
+    id: "sentry",
+    label: "Sentry",
+    description: "Adds Sentry error tracking with bootstrap instrumentation",
+    contribute: () => ({
+      templateRoots: [featureTemplateRoot("observability", "sentry")],
+      slots: {
+        "main.preImports": ["import './instrument';"],
+        "app.module.imports": [
+          "import { APP_FILTER } from '@nestjs/core';",
+          "import { SentryModule, SentryGlobalFilter } from '@sentry/nestjs/setup';",
+        ],
+        "app.module.moduleImports": ["SentryModule.forRoot()"],
+        "app.module.providers": [
+          "{ provide: APP_FILTER, useClass: SentryGlobalFilter }",
+        ],
+        "env.entries": [
+          'SENTRY_DSN=""',
+          'SENTRY_TRACES_SAMPLE_RATE="1.0"',
+        ],
+      },
+      packageJson: {
+        dependencies: {
+          "@sentry/nestjs": "^10.10.0",
+        },
+      },
+    }),
+  },
+  {
     id: "schedule",
     label: "Task Scheduling",
     description: "Enables @nestjs/schedule with an example cron job",
