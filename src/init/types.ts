@@ -1,5 +1,6 @@
 import { SelectionValues } from "../core";
 import { PackageManager } from "../data";
+import { ApiTransport } from "../generate/types";
 
 export interface InitPromptData {
   name: string;
@@ -7,6 +8,8 @@ export interface InitPromptData {
   packageManager: PackageManager["id"];
   installDependencies: boolean;
   initializeGit: boolean;
+  apiTransports: ApiTransport[];
+  starterModuleTransports: Partial<Record<string, ApiTransport[]>>;
   selections: SelectionValues;
 }
 
@@ -16,5 +19,7 @@ export interface InitPromptOverrides {
   packageManager?: PackageManager["id"];
   installDependencies?: boolean;
   initializeGit?: boolean;
+  apiTransports?: ApiTransport[];
+  starterModuleTransports?: Partial<Record<string, ApiTransport[]>>;
   selections?: Partial<SelectionValues>;
 }

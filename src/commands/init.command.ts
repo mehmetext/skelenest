@@ -14,6 +14,7 @@ interface InitCommandOptions {
   name?: string;
   port?: string;
   packageManager?: "npm" | "pnpm" | "yarn";
+  transports?: string[];
   orm?: string;
   architecture?: string;
   features?: string[];
@@ -34,6 +35,11 @@ export class InitCommand extends BaseCommand {
     this.option(
       "--package-manager <packageManager>",
       "Package manager: npm, pnpm, or yarn"
+    );
+    this.option(
+      "--transports <transports>",
+      "Comma-separated API transports: rest, graphql",
+      parseListOption
     );
     this.option(
       "--orm <orm>",
@@ -64,6 +70,10 @@ export class InitCommand extends BaseCommand {
     const options = this.opts<InitCommandOptions>();
     const selections: Partial<Record<string, SelectionValue>> = {};
 
+    if (options.transports) {
+      selections.apiTransports = options.transports;
+    }
+
     if (options.orm) {
       selections.orm = options.orm;
     }
@@ -84,6 +94,7 @@ export class InitCommand extends BaseCommand {
       name: options.name,
       port: options.port,
       packageManager: options.packageManager,
+      apiTransports: options.transports as ("rest" | "graphql")[] | undefined,
       installDependencies: options.install,
       initializeGit: options.git,
       selections,

@@ -1,0 +1,73 @@
+import { UseGuards } from '@nestjs/common';
+import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
+import { GetMeUseCase } from '../../application/use-cases/get-me.use-case';
+import { IssueAuthResponseUseCase } from '../../application/use-cases/issue-auth-response.use-case';
+import { LogoutUseCase } from '../../application/use-cases/logout.use-case';
+import { RefreshTokenUseCase } from '../../application/use-cases/refresh-token.use-case';
+import { RegisterUseCase } from '../../application/use-cases/register.use-case';
+import { ValidateUserUseCase } from '../../application/use-cases/validate-user.use-case';
+import { CurrentUser } from '../http/decorators/current-user.decorator';
+import {
+  AuthResponseDto,
+  AuthUserDto,
+  LoginDto,
+  RefreshTokenDto,
+  RegisterDto,
+} from '../../application/dto/auth.dto';
+import { JwtAuthGuard } from '../http/guards/jwt-auth.guard';
+import type { AuthenticatedRequestUser } from '../../types';
+
+@Resolver()
+export class AuthResolver {
+  constructor(
+    private readonly registerUseCase: RegisterUseCase,
+    private readonly validateUserUseCase: ValidateUserUseCase,
+    private readonly issueAuthResponseUseCase: IssueAuthResponseUseCase,
+    private readonly refreshTokenUseCase: RefreshTokenUseCase,
+    private readonly logoutUseCase: LogoutUseCase,
+    private readonly getMeUseCase: GetMeUseCase,
+  ) {}
+
+  @Mutation(() => AuthResponseDto)
+  register(@Args('input') dto: RegisterDto): Promise<AuthResponseDto> {
+    return this.registerUseCase.execute(dto);
+  }
+
+  @Mutation(() => AuthResponseDto)
+  async login(@Args('input') dto: LoginDto): Promise<AuthResponseDto> {
+    const user = await this.validateUserUseCase.execute(dto.email, dto.password);
+
+    if (!user) {
+      throw new Error('Invalid credentials');
+    }
+
+    return this.issueAuthResponseUseCase.execute(user.id);
+  }
+
+  @Mutation(() => AuthResponseDto)
+  refresh(@Args('input') dto: RefreshTokenDto): Promise<AuthResponseDto> {
+    return this.refreshTokenUseCase.execute(dto.refreshToken);
+  }
+
+  @Mutation(() => Boolean)
+  @UseGuards(JwtAuthGuard)
+  async logout(
+    @CurrentUser() user: AuthenticatedRequestUser,
+    @Args('input') dto: RefreshTokenDto,
+  ): Promise<boolean> {
+    await this.logoutUseCase.execute({
+      userId: user.id,
+      refreshToken: dto.refreshToken,
+      accessTokenJti: user.jti,
+      accessTokenExp: user.tokenExp,
+    });
+
+    return true;
+  }
+
+  @Query(() => AuthUserDto)
+  @UseGuards(JwtAuthGuard)
+  me(@CurrentUser() user: AuthenticatedRequestUser): Promise<AuthUserDto> {
+    return this.getMeUseCase.execute(user.id);
+  }
+}

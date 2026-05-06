@@ -2,6 +2,7 @@ import fs from "fs-extra";
 import path from "path";
 import { PackageManager } from "../data/package-managers";
 import {
+  ApiTransport,
   GenerateOrm,
   GenerateProjectContext,
   SkelenestProjectConfig,
@@ -20,6 +21,10 @@ function isOrm(value: unknown): value is SkelenestProjectConfig["orm"] {
     value === "typeorm" ||
     value === "sequelize"
   );
+}
+
+function isApiTransport(value: unknown): value is ApiTransport {
+  return value === "rest" || value === "graphql";
 }
 
 export async function loadGenerateProjectContext(
@@ -52,6 +57,19 @@ export async function loadGenerateProjectContext(
     throw new Error("Invalid Skelenest project metadata: features/modules must be arrays.");
   }
 
+  const apiTransports =
+    parsed.api &&
+    Array.isArray(parsed.api.transports) &&
+    parsed.api.transports.length > 0
+      ? parsed.api.transports
+      : null;
+
+  if (!apiTransports || !apiTransports.every(isApiTransport)) {
+    throw new Error(
+      "Invalid Skelenest project metadata: api.transports must be a non-empty array."
+    );
+  }
+
   const orm: GenerateOrm = parsed.orm ?? "none";
 
   return {
@@ -60,11 +78,15 @@ export async function loadGenerateProjectContext(
       version: parsed.version ?? 1,
       architecture: parsed.architecture,
       orm: parsed.orm,
+      api: {
+        transports: apiTransports,
+      },
       features: parsed.features,
       modules: parsed.modules,
     },
     architecture: parsed.architecture,
     orm,
+    apiTransports,
     selectedOptionIds: [
       parsed.architecture,
       ...(parsed.orm ? [parsed.orm] : []),

@@ -1,9 +1,19 @@
+<%_ const includesGraphql = Array.isArray(apiTransports) && apiTransports.includes('graphql'); _%>
 import { createParamDecorator, ExecutionContext } from "@nestjs/common";
+<%_ if (includesGraphql) { _%>
+import { GqlExecutionContext } from "@nestjs/graphql";
+<%_ } _%>
 import { Request } from "express";
 import { AuthenticatedRequestUser } from "../types";
 
 export const CurrentUser = createParamDecorator(
   (_data: unknown, ctx: ExecutionContext): AuthenticatedRequestUser => {
+<%_ if (includesGraphql) { _%>
+    if (ctx.getType<string>() === "graphql") {
+      return GqlExecutionContext.create(ctx).getContext<{ req: Request }>().req
+        .user as AuthenticatedRequestUser;
+    }
+<%_ } _%>
     const request = ctx.switchToHttp().getRequest<Request>();
     return request.user as AuthenticatedRequestUser;
   }

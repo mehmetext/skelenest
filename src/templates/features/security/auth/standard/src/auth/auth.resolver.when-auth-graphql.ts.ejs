@@ -1,0 +1,61 @@
+import { Args, Mutation, Query, Resolver } from "@nestjs/graphql";
+import { UseGuards } from "@nestjs/common";
+import { AuthService } from "./auth.service";
+import { CurrentUser } from "./decorators/current-user.decorator";
+import {
+  AuthResponseDto,
+  AuthUserDto,
+  LoginDto,
+  RefreshTokenDto,
+  RegisterDto,
+} from "./dto/auth.dto";
+import { JwtAuthGuard } from "./guards/jwt-auth.guard";
+import type { AuthenticatedRequestUser } from "./types";
+
+@Resolver()
+export class AuthResolver {
+  constructor(private readonly authService: AuthService) {}
+
+  @Mutation(() => AuthResponseDto)
+  register(@Args("input") dto: RegisterDto): Promise<AuthResponseDto> {
+    return this.authService.register(dto);
+  }
+
+  @Mutation(() => AuthResponseDto)
+  async login(@Args("input") dto: LoginDto): Promise<AuthResponseDto> {
+    const user = await this.authService.validateUser(dto.email, dto.password);
+
+    if (!user) {
+      throw new Error("Invalid credentials");
+    }
+
+    return this.authService.issueAuthResponse(user.id);
+  }
+
+  @Mutation(() => AuthResponseDto)
+  refresh(@Args("input") dto: RefreshTokenDto): Promise<AuthResponseDto> {
+    return this.authService.refresh(dto.refreshToken);
+  }
+
+  @Mutation(() => Boolean)
+  @UseGuards(JwtAuthGuard)
+  async logout(
+    @CurrentUser() user: AuthenticatedRequestUser,
+    @Args("input") dto: RefreshTokenDto,
+  ): Promise<boolean> {
+    await this.authService.logout(
+      user.id,
+      dto.refreshToken,
+      user.jti,
+      user.tokenExp,
+    );
+
+    return true;
+  }
+
+  @Query(() => AuthUserDto)
+  @UseGuards(JwtAuthGuard)
+  me(@CurrentUser() user: AuthenticatedRequestUser): Promise<AuthUserDto> {
+    return this.authService.getMe(user.id);
+  }
+}

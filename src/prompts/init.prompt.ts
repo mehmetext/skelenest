@@ -8,7 +8,9 @@ import {
   text,
 } from "@clack/prompts";
 import chalk from "chalk";
+import process from "node:process";
 import { PackageManager, packageManagers } from "../data";
+import { ApiTransport } from "../generate/types";
 import {
   initSelectionGroups,
   InitPromptData,
@@ -119,7 +121,46 @@ function normalizeMultiSelection(
     }
   }
 
-  return normalizedValues;
+  return normalizedValues.filter(isApiTransport);
+}
+
+function isApiTransport(value: string): value is ApiTransport {
+  return value === "rest" || value === "graphql";
+}
+
+function normalizeApiTransports(
+  values: string[] | undefined
+): ApiTransport[] | undefined {
+  if (values === undefined) {
+    return undefined;
+  }
+
+  const normalizedValues = Array.from(
+    new Set(values.map((value) => value.trim().toLowerCase()).filter(Boolean))
+  );
+
+  if (normalizedValues.length === 0) {
+    throw new Error("At least one API transport must be selected.");
+  }
+
+  for (const value of normalizedValues) {
+    if (!isApiTransport(value)) {
+      throw new Error(
+        `Unsupported API transport "${value}". Expected one of: rest, graphql.`
+      );
+    }
+  }
+
+  return normalizedValues as ApiTransport[];
+}
+
+function validateFeatureSupport(
+  apiTransports: ApiTransport[],
+  features: string[]
+): void {
+  if (features.includes("swagger") && !apiTransports.includes("rest")) {
+    throw new Error('Feature "swagger" requires the REST transport.');
+  }
 }
 
 function validateModuleSupport(orm: string, modules: string[]): void {
@@ -159,12 +200,26 @@ export class InitPrompt extends BasePrompt<InitPromptData> {
     const architectureGroup = findGroup("architecture");
     const featuresGroup = findGroup("features");
     const modulesGroup = findGroup("modules");
+    const overrideFeatureValues = Array.isArray(overrides.selections?.features)
+      ? overrides.selections.features.map(String)
+      : undefined;
+    const overrideModuleValues = Array.isArray(overrides.selections?.modules)
+      ? overrides.selections.modules.map(String)
+      : undefined;
 
     const initialName = normalizeTextValue(overrides.name, "Project name");
     const initialPort = normalizeTextValue(overrides.port, "Port");
     const initialPackageManager = normalizePackageManager(
       overrides.packageManager
     );
+    const initialApiTransports =
+      normalizeApiTransports(overrides.apiTransports) ??
+      normalizeApiTransports(
+        Array.isArray(overrides.selections?.apiTransports)
+          ? overrides.selections.apiTransports.map(String)
+          : undefined
+      ) ??
+      (!process.stdin.isTTY ? ["rest"] : undefined);
     const initialOrm = normalizeSingleSelection(
       "orm",
       typeof overrides.selections?.orm === "string"
@@ -179,15 +234,11 @@ export class InitPrompt extends BasePrompt<InitPromptData> {
     );
     const initialFeatures = normalizeMultiSelection(
       "features",
-      Array.isArray(overrides.selections?.features)
-        ? overrides.selections.features.map(String)
-        : undefined
+      overrideFeatureValues
     );
     const initialModules = normalizeMultiSelection(
       "modules",
-      Array.isArray(overrides.selections?.modules)
-        ? overrides.selections.modules.map(String)
-        : undefined
+      overrideModuleValues
     );
 
     const name =
@@ -248,6 +299,31 @@ export class InitPrompt extends BasePrompt<InitPromptData> {
       })) as string);
     if (isCancel(orm)) onCancel();
 
+    const apiTransports =
+      initialApiTransports ??
+      ((await multiselect({
+        message: "Which API transports should this project support?",
+        required: true,
+        initialValues: ["rest"],
+        options: [
+          {
+            value: "rest",
+            label: "REST",
+            hint: "Controllers, HTTP routes, and Swagger support",
+          },
+          {
+            value: "graphql",
+            label: "GraphQL",
+            hint: "Resolvers with Nest GraphQL code-first support",
+          },
+        ],
+      })) as ApiTransport[]);
+    if (isCancel(apiTransports)) onCancel();
+
+    if (apiTransports.length === 0) {
+      throw new Error("At least one API transport must be selected.");
+    }
+
     const architecture =
       initialArchitecture ??
       ((await select({
@@ -272,13 +348,28 @@ export class InitPrompt extends BasePrompt<InitPromptData> {
         initialValues: Array.isArray(featuresGroup.initialValue)
           ? featuresGroup.initialValue
           : undefined,
-        options: featuresGroup.options.map((option) => ({
-          value: option.id,
-          label: option.label,
-          hint: option.description,
-        })),
+        options: featuresGroup.options.map((option) => {
+          const isSupported =
+            option.id !== "swagger" || apiTransports.includes("rest");
+
+          return {
+            value: option.id,
+            label: option.label,
+            hint: isSupported
+              ? option.description
+              : "Requires the REST transport",
+            disabled: !isSupported,
+          };
+        }),
       })) as string[]);
     if (isCancel(features)) onCancel();
+    const resolvedFeatures =
+      features.length === 0 && overrideFeatureValues && overrideFeatureValues.length > 0
+        ? overrideFeatureValues
+            .map((value) => value.trim().toLowerCase())
+            .filter(Boolean)
+        : features;
+    validateFeatureSupport(apiTransports, resolvedFeatures);
 
     if (initialModules) {
       validateModuleSupport(orm, initialModules);
@@ -308,7 +399,41 @@ export class InitPrompt extends BasePrompt<InitPromptData> {
       })) as string[]);
     if (isCancel(modules)) onCancel();
 
-    validateModuleSupport(orm, modules);
+    const resolvedModules =
+      modules.length === 0 && overrideModuleValues && overrideModuleValues.length > 0
+        ? overrideModuleValues
+            .map((value) => value.trim().toLowerCase())
+            .filter(Boolean)
+        : modules;
+
+    validateModuleSupport(orm, resolvedModules);
+
+    const starterModuleTransports: Partial<Record<string, ApiTransport[]>> = {};
+
+    if (resolvedModules.includes("auth")) {
+      starterModuleTransports.auth =
+        apiTransports.length === 1
+          ? [...apiTransports]
+          : ((await multiselect({
+              message: "Which transports should the Auth module expose?",
+              required: true,
+              initialValues: [...apiTransports],
+              options: apiTransports.map((transport) => ({
+                value: transport,
+                label: transport === "rest" ? "REST" : "GraphQL",
+                hint:
+                  transport === "rest"
+                    ? "Auth controller endpoints"
+                    : "Auth resolver operations",
+              })),
+            })) as ApiTransport[]);
+
+      if (isCancel(starterModuleTransports.auth)) onCancel();
+
+      if (!starterModuleTransports.auth?.length) {
+        throw new Error("Auth module must expose at least one transport.");
+      }
+    }
 
     const installDependencies =
       overrides.installDependencies ??
@@ -330,13 +455,16 @@ export class InitPrompt extends BasePrompt<InitPromptData> {
       name,
       port,
       packageManager,
+      apiTransports,
+      starterModuleTransports,
       installDependencies,
       initializeGit,
       selections: {
+        apiTransports,
         orm,
         architecture,
-        features,
-        modules,
+        features: resolvedFeatures,
+        modules: resolvedModules,
       },
     };
   }

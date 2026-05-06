@@ -8,6 +8,7 @@ import {
   ScaffoldingContribution,
 } from "../core";
 import { packageManagers } from "../data";
+import { ApiTransport } from "../generate/types";
 import { initSelectionGroups } from "./selection-groups";
 import { resolveTemplatesRoot } from "./template-root";
 import { InitPromptData } from "./types";
@@ -94,9 +95,67 @@ function createBasePackageJson(name: string): PackageJsonShape {
   };
 }
 
+function createGraphqlContribution(): ScaffoldingContribution {
+  return {
+    slots: {
+      "app.module.imports": [
+        "import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo';",
+        "import { GraphQLModule } from '@nestjs/graphql';",
+        "import { join } from 'node:path';",
+      ],
+      "app.module.moduleImports": [
+        `GraphQLModule.forRoot<ApolloDriverConfig>({
+      driver: ApolloDriver,
+      autoSchemaFile: join(process.cwd(), 'src/schema.gql'),
+      sortSchema: true,
+      playground: true,
+    })`,
+      ],
+    },
+    packageJson: {
+      dependencies: {
+        "@apollo/server": "^5.0.0",
+        "@as-integrations/express5": "^1.1.2",
+        "@nestjs/apollo": "^13.4.0",
+        "@nestjs/graphql": "^13.2.0",
+        graphql: "^16.11.0",
+      },
+    },
+  };
+}
+
+function formatTransportLabel(transport: ApiTransport): string {
+  return transport === "rest" ? "REST" : "GraphQL";
+}
+
+function buildTemplateOptionIds(input: {
+  selectedOptionIds: string[];
+  apiTransports: ApiTransport[];
+  starterModuleTransports: Partial<Record<string, ApiTransport[]>>;
+}): string[] {
+  const { selectedOptionIds, apiTransports, starterModuleTransports } = input;
+  const optionIds = new Set<string>(selectedOptionIds);
+
+  for (const transport of apiTransports) {
+    optionIds.add(transport);
+  }
+
+  for (const [moduleId, transports] of Object.entries(starterModuleTransports)) {
+    for (const transport of transports ?? []) {
+      optionIds.add(`${moduleId}-${transport}`);
+    }
+  }
+
+  return [...optionIds];
+}
+
 export function createInitBlueprint(
   data: InitPromptData
 ): ScaffoldingBlueprint {
+  const apiTransports: ApiTransport[] =
+    Array.isArray(data.apiTransports) && data.apiTransports.length > 0
+      ? data.apiTransports
+      : ["rest"];
   const selectedPackageManager = packageManagers.find(
     (packageManager) => packageManager.id === data.packageManager
   );
@@ -107,9 +166,15 @@ export function createInitBlueprint(
 
   const projectDisplayName = formatProjectDisplayName(data.name);
   const helloMessage = `Welcome to ${projectDisplayName}!`;
+  const starterModuleTransports = data.starterModuleTransports ?? {};
   const selectionState = resolveSelectionState({
     selectionGroups: initSelectionGroups,
     selections: data.selections,
+  });
+  const templateOptionIds = buildTemplateOptionIds({
+    selectedOptionIds: selectionState.selectedOptionIds,
+    apiTransports,
+    starterModuleTransports,
   });
 
   const baseContribution: ScaffoldingContribution = {
@@ -126,7 +191,9 @@ export function createInitBlueprint(
         selectedPackageManager.pmGlobalInstallCommand,
       packageManagerName: selectedPackageManager.name,
       packageManagerField: selectedPackageManager.packageManagerField,
-      selectedOptionIds: selectionState.selectedOptionIds,
+      selectedOptionIds: templateOptionIds,
+      apiTransports,
+      starterModuleTransports,
     },
   };
 
@@ -135,6 +202,10 @@ export function createInitBlueprint(
     selectionGroups: initSelectionGroups,
     selectionState,
   });
+
+  if (apiTransports.includes("graphql")) {
+    selectedContributions.push(createGraphqlContribution());
+  }
 
   return composeScaffoldingBlueprint({
     baseContributions: [baseContribution],
@@ -157,6 +228,7 @@ export function createInitBlueprint(
           selectionState.selectedTechnologies.find(
             (technology) => technology.groupId === "orm"
           )?.option.label ?? null,
+        apiTransports: apiTransports.map(formatTransportLabel),
         features: selectionState.selectedTechnologies
           .filter((technology) => technology.groupId === "features")
           .map((technology) => technology.option.label),

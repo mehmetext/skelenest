@@ -1,6 +1,7 @@
 <%_ const includesRedis = selectedOptionIds.includes('redis'); _%>
 <%_ const isSequelize = selectedOptionIds.includes('sequelize'); _%>
 <%_ const isTypeOrm = selectedOptionIds.includes('typeorm'); _%>
+<%_ const includesGraphql = Array.isArray(apiTransports) && apiTransports.includes('graphql'); _%>
 <%_ if (!includesRedis) { _%>
 <%_ if (isSequelize) { _%>
 import { InjectModel } from "@nestjs/sequelize";
@@ -15,6 +16,9 @@ import { PrismaService } from "src/prisma/prisma.service";
 <%_ } _%>
 import { ExecutionContext, Injectable<% if (includesRedis || isSequelize || isTypeOrm) { %>, UnauthorizedException<% } %> } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
+<%_ if (includesGraphql) { _%>
+import { GqlExecutionContext } from "@nestjs/graphql";
+<%_ } _%>
 import type { Request } from "express";
 <%_ if (includesRedis) { _%>
 import { InjectRedis } from "@nestjs-modules/ioredis";
@@ -39,13 +43,12 @@ export class JwtAuthGuard extends AuthGuard("jwt") {
     const result = await (super.canActivate(context) as Promise<boolean>);
     if (!result) return false;
 
+    const request = this.getRequest(context);
 <%_ if (includesRedis) { _%>
-    const request = context.switchToHttp().getRequest<Request>();
     const user = request.user as AuthenticatedRequestUser;
     const blocked = await this.redis.exists(BLOCKLIST_KEY(user.jti));
     if (blocked) throw new UnauthorizedException("Token has been revoked");
 <%_ } else { _%>
-    const request = context.switchToHttp().getRequest<Request>();
     const user = request.user as AuthenticatedRequestUser;
     const blocked = await <% if (isSequelize) { %>this.revokedAccessTokens.findOne({
       where: { jti: user.jti },
@@ -61,5 +64,14 @@ export class JwtAuthGuard extends AuthGuard("jwt") {
 <%_ } _%>
 
     return true;
+  }
+
+  getRequest(context: ExecutionContext): Request {
+<%_ if (includesGraphql) { _%>
+    if (context.getType<string>() === "graphql") {
+      return GqlExecutionContext.create(context).getContext<{ req: Request }>().req;
+    }
+<%_ } _%>
+    return context.switchToHttp().getRequest<Request>();
   }
 }

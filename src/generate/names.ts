@@ -53,10 +53,12 @@ export function createResourceNames(input: string): ResourceNames {
     singularPascal,
     pluralPascal,
     controllerClassName: `${pluralPascal}Controller`,
+    resolverClassName: `${pluralPascal}Resolver`,
     serviceClassName: `${pluralPascal}Service`,
     moduleClassName: `${pluralPascal}Module`,
     entityClassName: `${singularPascal}Entity`,
     modelClassName: `${singularPascal}Model`,
+    objectTypeClassName: singularPascal,
     repositorySymbolName: `${singularKebab
       .toUpperCase()
       .replace(/-/g, "_")}_REPOSITORY`,

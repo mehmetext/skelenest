@@ -2,6 +2,8 @@
 <%_ const includesBullmq = selectedOptionIds.includes('bullmq'); _%>
 <%_ const includesThrottler = selectedOptionIds.includes('throttler'); _%>
 <%_ const includesElasticsearch = selectedOptionIds.includes('elasticsearch'); _%>
+<%_ const includesRest = Array.isArray(apiTransports) && apiTransports.includes('rest'); _%>
+<%_ const includesGraphql = Array.isArray(apiTransports) && apiTransports.includes('graphql'); _%>
 <%_ if (includesRedis) { _%>
 import { RedisModule } from '@nestjs-modules/ioredis';
 <%_ } _%>
@@ -24,7 +26,12 @@ const appModuleEntries = getSlot('app.module.moduleImports');
 <%_ if (appModuleImports.length > 0) { _%>
 <%- appModuleImports.join('\n') %>
 <%_ } _%>
+<%_ if (includesGraphql) { _%>
+import { AppResolver } from './app.resolver';
+<%_ } _%>
+<%_ if (includesRest) { _%>
 import { AppController } from './app.controller';
+<%_ } _%>
 import { AppService } from './app.service';
 
 @Module({
@@ -91,9 +98,12 @@ import { AppService } from './app.service';
 <%- appModuleEntries.map((moduleImport) => `    ${moduleImport},`).join('\n') %>
 <%_ } _%>
   ],
-  controllers: [AppController],
+  controllers: [<%= includesRest ? 'AppController' : '' %>],
   providers: [
     AppService,
+<%_ if (includesGraphql) { _%>
+    AppResolver,
+<%_ } _%>
 <%_ if (includesThrottler) { _%>
     {
       provide: APP_GUARD,

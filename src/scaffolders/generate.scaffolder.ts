@@ -16,6 +16,7 @@ import {
 } from "../generate/project-updater";
 import { runPackageManagerFormat } from "../utils";
 import { BaseScaffolder } from "./base.scaffolder";
+import { resolveGenerateTransports } from "./generate-transports.prompt";
 import { confirmCleanGitWorkingTree } from "./git-working-tree.guard";
 
 type GenerateMode = "module" | "resource";
@@ -35,6 +36,20 @@ export class GenerateScaffolder extends BaseScaffolder {
       return;
     }
 
+    const selectedTransports = await resolveGenerateTransports({
+      availableTransports: context.apiTransports,
+      message: `Which transports should this ${this.mode} expose?`,
+    });
+
+    if (selectedTransports.length === 0) {
+      return;
+    }
+
+    const generationContext = {
+      ...context,
+      apiTransports: selectedTransports,
+    };
+
     const names = createResourceNames(this.inputName);
     const moduleRoot =
       context.architecture === "standard"
@@ -46,7 +61,7 @@ export class GenerateScaffolder extends BaseScaffolder {
     }
 
     const files = buildGeneratedFiles({
-      context,
+      context: generationContext,
       names,
       mode: this.mode,
     });

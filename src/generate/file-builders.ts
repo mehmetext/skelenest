@@ -7,19 +7,35 @@ function hasSwagger(context: GenerateProjectContext): boolean {
   return context.config.features.includes("swagger");
 }
 
+function hasGraphql(context: GenerateProjectContext): boolean {
+  return context.apiTransports.includes("graphql");
+}
+
 function servicePropertyName(names: ResourceNames): string {
   return `${names.serviceClassName.charAt(0).toLowerCase()}${names.serviceClassName.slice(1)}`;
+}
+
+function singularFieldName(names: ResourceNames): string {
+  return `${names.singularPascal.charAt(0).toLowerCase()}${names.singularPascal.slice(1)}`;
+}
+
+function pluralFieldName(names: ResourceNames): string {
+  return `${names.pluralPascal.charAt(0).toLowerCase()}${names.pluralPascal.slice(1)}`;
 }
 
 function buildDtoContent(
   className: string,
   swaggerEnabled: boolean,
+  graphqlEnabled: boolean,
   isUpdateDto: boolean
 ): string {
   const swaggerImport = swaggerEnabled
     ? `import { ${
         isUpdateDto ? "ApiPropertyOptional" : "ApiProperty, ApiPropertyOptional"
       } } from '@nestjs/swagger';\n`
+    : "";
+  const graphqlImport = graphqlEnabled
+    ? `import { Field, InputType } from '@nestjs/graphql';\n`
     : "";
   const nameDecorator = swaggerEnabled
     ? isUpdateDto
@@ -32,18 +48,27 @@ function buildDtoContent(
   const activeDecorator = swaggerEnabled
     ? "  @ApiPropertyOptional({ example: true, required: false })\n"
     : "";
+  const graphqlNameDecorator = graphqlEnabled
+    ? `  @Field(() => String${isUpdateDto ? ", { nullable: true }" : ""})\n`
+    : "";
+  const graphqlDescriptionDecorator = graphqlEnabled
+    ? "  @Field(() => String, { nullable: true })\n"
+    : "";
+  const graphqlActiveDecorator = graphqlEnabled
+    ? "  @Field(() => Boolean, { nullable: true })\n"
+    : "";
 
-  return `${swaggerImport}import { IsBoolean, IsOptional, IsString } from 'class-validator';
+  return `${swaggerImport}${graphqlImport}import { IsBoolean, IsOptional, IsString } from 'class-validator';
 
-export class ${className} {
-${nameDecorator}${isUpdateDto ? "  @IsOptional()\n" : ""}  @IsString()
+${graphqlEnabled ? "@InputType()\n" : ""}export class ${className} {
+${nameDecorator}${graphqlNameDecorator}${isUpdateDto ? "  @IsOptional()\n" : ""}  @IsString()
   name${isUpdateDto ? "?" : ""}: string;
 
-${descriptionDecorator}  @IsOptional()
+${descriptionDecorator}${graphqlDescriptionDecorator}  @IsOptional()
   @IsString()
   description?: string;
 
-${activeDecorator}  @IsOptional()
+${activeDecorator}${graphqlActiveDecorator}  @IsOptional()
   @IsBoolean()
   isActive?: boolean;
 }
@@ -155,9 +180,12 @@ export class ${names.modelClassName} extends Model<
 
 function buildStandardModuleFile(
   names: ResourceNames,
-  orm: GenerateProjectContext["orm"],
+  context: GenerateProjectContext,
   mode: GenerateMode
 ): string {
+  const orm = context.orm;
+  const includesRest = context.apiTransports.includes("rest");
+  const includesGraphql = context.apiTransports.includes("graphql");
   const resourceImports =
     mode === "resource" && orm === "typeorm"
       ? `import { TypeOrmModule } from '@nestjs/typeorm';
@@ -174,14 +202,24 @@ import { ${names.modelClassName} } from '../database/models/${names.singularKeba
       : mode === "resource" && orm === "sequelize"
         ? "  imports: [SequelizeModule.forFeature([" + names.modelClassName + "])],\n"
         : "";
+  const transportImports = [
+    includesRest
+      ? `import { ${names.controllerClassName} } from './${names.moduleSegment}.controller';`
+      : null,
+    includesGraphql
+      ? `import { ${names.resolverClassName} } from './${names.moduleSegment}.resolver';`
+      : null,
+  ]
+    .filter(Boolean)
+    .join("\n");
 
   return `import { Module } from '@nestjs/common';
-${resourceImports}import { ${names.controllerClassName} } from './${names.moduleSegment}.controller';
+${resourceImports}${transportImports ? `${transportImports}\n` : ""}
 import { ${names.serviceClassName} } from './${names.moduleSegment}.service';
 
 @Module({
-${importsArray}  controllers: [${names.controllerClassName}],
-  providers: [${names.serviceClassName}],
+${importsArray}  controllers: [${includesRest ? names.controllerClassName : ""}],
+  providers: [${names.serviceClassName}${includesGraphql ? `, ${names.resolverClassName}` : ""}],
   exports: [${names.serviceClassName}],
 })
 export class ${names.moduleClassName} {}
@@ -258,6 +296,123 @@ export class ${names.controllerClassName} {
   constructor(private readonly ${propertyName}: ${names.serviceClassName}) {}
 
 ${body}
+}
+`;
+}
+
+function buildGraphqlObjectTypeFile(
+  names: ResourceNames,
+  context: GenerateProjectContext
+): string {
+  const idDecoratorType =
+    context.orm === "prisma" || context.orm === "none" ? "String" : "Int";
+  const idTsType =
+    context.orm === "prisma" || context.orm === "none" ? "string" : "number";
+  const idImport = idDecoratorType === "Int" ? "Int, " : "";
+
+  return `import { Field, GraphQLISODateTime, ${idImport}ObjectType } from '@nestjs/graphql';
+
+@ObjectType()
+export class ${names.objectTypeClassName} {
+  @Field(() => ${idDecoratorType})
+  id: ${idTsType};
+
+  @Field(() => String)
+  name: string;
+
+  @Field(() => String, { nullable: true })
+  description: string | null;
+
+  @Field(() => Boolean)
+  isActive: boolean;
+
+  @Field(() => GraphQLISODateTime)
+  createdAt: Date;
+
+  @Field(() => GraphQLISODateTime)
+  updatedAt: Date;
+}
+`;
+}
+
+function buildGraphqlResolverIdDecorator(context: GenerateProjectContext): string {
+  return context.orm === "prisma" || context.orm === "none" ? "String" : "Int";
+}
+
+function buildStandardResolverFile(
+  names: ResourceNames,
+  context: GenerateProjectContext,
+  mode: GenerateMode
+): string {
+  const propertyName = servicePropertyName(names);
+  const singularName = singularFieldName(names);
+  const pluralName = pluralFieldName(names);
+
+  if (mode === "module") {
+    return `import { Query, Resolver } from '@nestjs/graphql';
+import { ${names.serviceClassName} } from './${names.moduleSegment}.service';
+
+@Resolver()
+export class ${names.resolverClassName} {
+  constructor(private readonly ${propertyName}: ${names.serviceClassName}) {}
+
+  @Query(() => String)
+  ${singularName}Status() {
+    return JSON.stringify(this.${propertyName}.getStatus());
+  }
+}
+`;
+  }
+
+  const idDecoratorType = buildGraphqlResolverIdDecorator(context);
+  const idArgumentType =
+    context.orm === "prisma" || context.orm === "none" ? "string" : "number";
+  const idImport = idDecoratorType === "Int" ? "Int, " : "";
+
+  return `import { Args, ${idImport}Mutation, Query, Resolver } from '@nestjs/graphql';
+import { ${names.objectTypeClassName} } from './graphql/${names.singularKebab}.type';
+import { ${names.serviceClassName} } from './${names.moduleSegment}.service';
+import { ${names.createDtoClassName} } from './dto/create-${names.singularKebab}.dto';
+import { ${names.updateDtoClassName} } from './dto/update-${names.singularKebab}.dto';
+
+@Resolver(() => ${names.objectTypeClassName})
+export class ${names.resolverClassName} {
+  constructor(private readonly ${propertyName}: ${names.serviceClassName}) {}
+
+  @Query(() => [${names.objectTypeClassName}])
+  ${pluralName}() {
+    return this.${propertyName}.findAll();
+  }
+
+  @Query(() => ${names.objectTypeClassName}, { nullable: true })
+  ${singularName}(
+    @Args('id', { type: () => ${idDecoratorType} }) id: ${idArgumentType},
+  ) {
+    return this.${propertyName}.findOne(String(id));
+  }
+
+  @Mutation(() => ${names.objectTypeClassName})
+  create${names.singularPascal}(
+    @Args('input') dto: ${names.createDtoClassName},
+  ) {
+    return this.${propertyName}.create(dto);
+  }
+
+  @Mutation(() => ${names.objectTypeClassName}, { nullable: true })
+  update${names.singularPascal}(
+    @Args('id', { type: () => ${idDecoratorType} }) id: ${idArgumentType},
+    @Args('input') dto: ${names.updateDtoClassName},
+  ) {
+    return this.${propertyName}.update(String(id), dto);
+  }
+
+  @Mutation(() => Boolean)
+  async remove${names.singularPascal}(
+    @Args('id', { type: () => ${idDecoratorType} }) id: ${idArgumentType},
+  ): Promise<boolean> {
+    await this.${propertyName}.remove(String(id));
+    return true;
+  }
 }
 `;
 }
@@ -494,6 +649,8 @@ function buildLayeredModuleFile(
   context: GenerateProjectContext,
   mode: GenerateMode
 ): string {
+  const includesRest = context.apiTransports.includes("rest");
+  const includesGraphql = context.apiTransports.includes("graphql");
   const persistenceImports =
     mode === "resource" && context.orm === "typeorm"
       ? `import { TypeOrmModule } from '@nestjs/typeorm';
@@ -528,6 +685,7 @@ import { ${
     .join(", ");
   const providerList = [
     names.serviceClassName,
+    includesGraphql ? names.resolverClassName : null,
     mode === "resource" && context.orm !== "none"
       ? `{
       provide: ${names.repositorySymbolName},
@@ -546,10 +704,10 @@ import { ${
 
   return `import { Module } from '@nestjs/common';
 ${persistenceImports}${repositoryImports}import { ${names.serviceClassName} } from './application/${names.moduleSegment}.service';
-import { ${names.controllerClassName} } from './presentation/http/${names.moduleSegment}.controller';
+${includesRest ? `import { ${names.controllerClassName} } from './presentation/http/${names.moduleSegment}.controller';\n` : ""}${includesGraphql ? `import { ${names.resolverClassName} } from './presentation/graphql/${names.moduleSegment}.resolver';\n` : ""}
 
 @Module({
-${importsList ? `  imports: [${importsList}],\n` : ""}  controllers: [${names.controllerClassName}],
+${importsList ? `  imports: [${importsList}],\n` : ""}  controllers: [${includesRest ? names.controllerClassName : ""}],
   providers: [
     ${providerList},
   ],
@@ -565,6 +723,32 @@ function buildLayeredControllerFile(
   mode: GenerateMode
 ): string {
   return buildStandardControllerFile(names, swaggerEnabled, mode)
+    .replace(
+      `import { ${names.serviceClassName} } from './${names.moduleSegment}.service';`,
+      `import { ${names.serviceClassName} } from '../../application/${names.moduleSegment}.service';`
+    )
+    .replace(
+      `import { ${names.createDtoClassName} } from './dto/create-${names.singularKebab}.dto';`,
+      `import { ${names.createDtoClassName} } from '../../application/dto/create-${names.singularKebab}.dto';`
+    )
+    .replace(
+      `import { ${names.updateDtoClassName} } from './dto/update-${names.singularKebab}.dto';`,
+      `import { ${names.updateDtoClassName} } from '../../application/dto/update-${names.singularKebab}.dto';`
+    );
+}
+
+function buildLayeredResolverFile(
+  names: ResourceNames,
+  context: GenerateProjectContext,
+  mode: GenerateMode
+): string {
+  return buildStandardResolverFile(names, context, mode)
+    .replace(
+      `import { ${names.objectTypeClassName} } from './graphql/${names.singularKebab}.type';\n`,
+      mode === "resource"
+        ? `import { ${names.objectTypeClassName} } from './types/${names.singularKebab}.type';\n`
+        : ""
+    )
     .replace(
       `import { ${names.serviceClassName} } from './${names.moduleSegment}.service';`,
       `import { ${names.serviceClassName} } from '../../application/${names.moduleSegment}.service';`
@@ -1050,11 +1234,7 @@ function buildStandardFiles(
   const files: GeneratedFile[] = [
     {
       path: path.join(baseDir, `${names.moduleSegment}.module.ts`),
-      content: buildStandardModuleFile(names, context.orm, mode),
-    },
-    {
-      path: path.join(baseDir, `${names.moduleSegment}.controller.ts`),
-      content: buildStandardControllerFile(names, hasSwagger(context), mode),
+      content: buildStandardModuleFile(names, context, mode),
     },
     {
       path: path.join(baseDir, `${names.moduleSegment}.service.ts`),
@@ -1062,17 +1242,48 @@ function buildStandardFiles(
     },
   ];
 
+  if (context.apiTransports.includes("rest")) {
+    files.push({
+      path: path.join(baseDir, `${names.moduleSegment}.controller.ts`),
+      content: buildStandardControllerFile(names, hasSwagger(context), mode),
+    });
+  }
+
+  if (context.apiTransports.includes("graphql")) {
+    files.push({
+      path: path.join(baseDir, `${names.moduleSegment}.resolver.ts`),
+      content: buildStandardResolverFile(names, context, mode),
+    });
+  }
+
   if (mode === "resource") {
     files.push(
       {
         path: path.join(baseDir, "dto", `create-${names.singularKebab}.dto.ts`),
-        content: buildDtoContent(names.createDtoClassName, hasSwagger(context), false),
+        content: buildDtoContent(
+          names.createDtoClassName,
+          hasSwagger(context),
+          hasGraphql(context),
+          false
+        ),
       },
       {
         path: path.join(baseDir, "dto", `update-${names.singularKebab}.dto.ts`),
-        content: buildDtoContent(names.updateDtoClassName, hasSwagger(context), true),
+        content: buildDtoContent(
+          names.updateDtoClassName,
+          hasSwagger(context),
+          hasGraphql(context),
+          true
+        ),
       }
     );
+
+    if (context.apiTransports.includes("graphql")) {
+      files.push({
+        path: path.join(baseDir, "graphql", `${names.singularKebab}.type.ts`),
+        content: buildGraphqlObjectTypeFile(names, context),
+      });
+    }
   }
 
   if (mode === "resource" && context.orm === "typeorm") {
@@ -1120,6 +1331,13 @@ function buildLayeredFiles(
       content: buildLayeredServiceFile(names, context, mode),
     },
     {
+      path: path.join(baseDir, "infrastructure", ".gitkeep"),
+      content: "",
+    },
+  ];
+
+  if (context.apiTransports.includes("rest")) {
+    files.push({
       path: path.join(
         baseDir,
         "presentation",
@@ -1127,12 +1345,20 @@ function buildLayeredFiles(
         `${names.moduleSegment}.controller.ts`
       ),
       content: buildLayeredControllerFile(names, hasSwagger(context), mode),
-    },
-    {
-      path: path.join(baseDir, "infrastructure", ".gitkeep"),
-      content: "",
-    },
-  ];
+    });
+  }
+
+  if (context.apiTransports.includes("graphql")) {
+    files.push({
+      path: path.join(
+        baseDir,
+        "presentation",
+        "graphql",
+        `${names.moduleSegment}.resolver.ts`
+      ),
+      content: buildLayeredResolverFile(names, context, mode),
+    });
+  }
 
   if (mode === "module") {
     files.push(
@@ -1143,6 +1369,13 @@ function buildLayeredFiles(
         content: "",
       }
     );
+
+    if (context.apiTransports.includes("graphql")) {
+      files.push({
+        path: path.join(baseDir, "presentation", "graphql", ".gitkeep"),
+        content: "",
+      });
+    }
   }
 
   if (mode === "resource") {
@@ -1154,7 +1387,12 @@ function buildLayeredFiles(
           "dto",
           `create-${names.singularKebab}.dto.ts`
         ),
-        content: buildDtoContent(names.createDtoClassName, hasSwagger(context), false),
+        content: buildDtoContent(
+          names.createDtoClassName,
+          hasSwagger(context),
+          hasGraphql(context),
+          false
+        ),
       },
       {
         path: path.join(
@@ -1163,9 +1401,27 @@ function buildLayeredFiles(
           "dto",
           `update-${names.singularKebab}.dto.ts`
         ),
-        content: buildDtoContent(names.updateDtoClassName, hasSwagger(context), true),
+        content: buildDtoContent(
+          names.updateDtoClassName,
+          hasSwagger(context),
+          hasGraphql(context),
+          true
+        ),
       }
     );
+
+    if (context.apiTransports.includes("graphql")) {
+      files.push({
+        path: path.join(
+          baseDir,
+          "presentation",
+          "graphql",
+          "types",
+          `${names.singularKebab}.type.ts`
+        ),
+        content: buildGraphqlObjectTypeFile(names, context),
+      });
+    }
 
     if (context.orm !== "none") {
       files.push({

@@ -1,6 +1,7 @@
 import { ValidationPipe } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 <%_ const includesSwagger = selectedOptionIds.includes('swagger'); _%>
+<%_ const includesRest = Array.isArray(apiTransports) && apiTransports.includes('rest'); _%>
 <%_ if (includesSwagger) { _%>
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 <%_ } _%>
@@ -28,7 +29,7 @@ async function bootstrap() {
       stopAtFirstError: true,
     })
   );
-<%_ if (includesSwagger) { _%>
+<%_ if (includesSwagger && includesRest) { _%>
 
   const config = new DocumentBuilder()
     .setTitle('<%= projectDisplayName %>')

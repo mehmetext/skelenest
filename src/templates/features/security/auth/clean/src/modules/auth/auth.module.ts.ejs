@@ -1,6 +1,9 @@
 <%_ const includesRedis = selectedOptionIds.includes('redis'); _%>
 <%_ const isSequelize = selectedOptionIds.includes('sequelize'); _%>
 <%_ const isTypeOrm = selectedOptionIds.includes('typeorm'); _%>
+<%_ const authTransportsValue = Array.isArray(authTransports) ? authTransports : ['rest']; _%>
+<%_ const includesRest = authTransportsValue.includes('rest'); _%>
+<%_ const includesGraphql = authTransportsValue.includes('graphql'); _%>
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
@@ -47,7 +50,12 @@ import { RedisAuthSessionStoreAdapter } from './infrastructure/cache/redis-auth-
 <%_ } _%>
 import { JwtAuthTokenAdapter } from './infrastructure/security/jwt-auth-token.adapter';
 import { ScryptPasswordHasherAdapter } from './infrastructure/security/scrypt-password-hasher.adapter';
+<%_ if (includesRest) { _%>
 import { AuthController } from './presentation/http/auth.controller';
+<%_ } _%>
+<%_ if (includesGraphql) { _%>
+import { AuthResolver } from './presentation/graphql/auth.resolver';
+<%_ } _%>
 import { JwtAuthGuard } from './presentation/http/guards/jwt-auth.guard';
 import { LocalAuthGuard } from './presentation/http/guards/local-auth.guard';
 import { JwtStrategy } from './presentation/http/strategies/jwt.strategy';
@@ -72,8 +80,11 @@ import { LocalStrategy } from './presentation/http/strategies/local.strategy';
       }),
     }),
   ],
-  controllers: [AuthController],
+  controllers: [<%= includesRest ? 'AuthController' : '' %>],
   providers: [
+<%_ if (includesGraphql) { _%>
+    AuthResolver,
+<%_ } _%>
     RegisterUseCase,
     ValidateUserUseCase,
     IssueAuthResponseUseCase,

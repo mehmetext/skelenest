@@ -25,6 +25,22 @@ function resolveModuleImportPath(architecture: ArchitectureId): string {
   return "./modules/auth/auth.module";
 }
 
+function resolveAuthTransports(
+  context: InitPromptData
+): ("rest" | "graphql")[] {
+  const configured = context.starterModuleTransports?.auth;
+
+  if (configured && configured.length > 0) {
+    return configured;
+  }
+
+  if (Array.isArray(context.apiTransports) && context.apiTransports.length > 0) {
+    return [...context.apiTransports];
+  }
+
+  return ["rest"];
+}
+
 export const authModulePreset: ModulePresetDefinition<InitPromptData> = {
   id: "auth",
   label: "Auth Starter Module",
@@ -34,6 +50,7 @@ export const authModulePreset: ModulePresetDefinition<InitPromptData> = {
     const { architecture } = input;
     const includesRedis = input.context.has("redis");
     const includesSwagger = input.context.has("swagger");
+    const authTransports = resolveAuthTransports(input.context.input);
     const usersContribution = usersModulePreset.resolveContribution(input);
 
     return {
@@ -147,6 +164,10 @@ export const authModulePreset: ModulePresetDefinition<InitPromptData> = {
         scripts: {
           ...(usersContribution.packageJson?.scripts ?? {}),
         },
+      },
+      templateData: {
+        ...(usersContribution.templateData ?? {}),
+        authTransports,
       },
     } satisfies ScaffoldingContribution;
   },

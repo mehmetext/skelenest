@@ -3,6 +3,7 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
+<%_ const includesRest = Array.isArray(apiTransports) && apiTransports.includes('rest'); _%>
 
 describe('AppController (e2e)', () => {
   let app: INestApplication<App>;
@@ -16,12 +17,26 @@ describe('AppController (e2e)', () => {
     await app.init();
   });
 
+<%_ if (includesRest) { _%>
   it('/ (GET)', () => {
     return request(app.getHttpServer())
       .get('/')
       .expect(200)
       .expect('<%= helloMessage %>');
   });
+<%_ } else { _%>
+  it('/graphql (POST)', () => {
+    return request(app.getHttpServer())
+      .post('/graphql')
+      .send({
+        query: '{ hello }',
+      })
+      .expect(200)
+      .expect((response) => {
+        expect(response.body.data.hello).toBe('<%= helloMessage %>');
+      });
+  });
+<%_ } _%>
 
   afterEach(async () => {
     await app.close();

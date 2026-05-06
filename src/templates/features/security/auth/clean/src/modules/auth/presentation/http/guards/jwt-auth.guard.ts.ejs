@@ -1,5 +1,10 @@
+<%_ const includesGraphql = Array.isArray(apiTransports) && apiTransports.includes('graphql'); _%>
 import { Inject, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+<%_ if (includesGraphql) { _%>
+import { GqlExecutionContext } from '@nestjs/graphql';
+import type { Request } from 'express';
+<%_ } _%>
 import { AUTH_SESSION_STORE } from '../../../application/ports/auth-session-store.port';
 import type { AuthSessionStore } from '../../../application/ports/auth-session-store.port';
 import type { AuthenticatedRequestUser } from '../../../types';
@@ -17,11 +22,21 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     const result = await (super.canActivate(context) as Promise<boolean>);
     if (!result) return false;
 
-    const request = context.switchToHttp().getRequest();
+    const request = this.getRequest(context);
     const user = request.user as AuthenticatedRequestUser;
     const blocked = await this.authSessionStore.isAccessTokenBlocked(user.jti);
     if (blocked) throw new UnauthorizedException('Token has been revoked');
 
     return true;
   }
+
+<%_ if (includesGraphql) { _%>
+  getRequest(context: ExecutionContext): Request {
+    if (context.getType<string>() === 'graphql') {
+      return GqlExecutionContext.create(context).getContext<{ req: Request }>().req;
+    }
+
+    return context.switchToHttp().getRequest<Request>();
+  }
+<%_ } _%>
 }

@@ -1,6 +1,10 @@
 <%_ const includesSwagger = selectedOptionIds.includes('swagger'); _%>
+<%_ const includesGraphql = Array.isArray(apiTransports) && apiTransports.includes('graphql'); _%>
 <%_ if (includesSwagger) { _%>
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+<%_ } _%>
+<%_ if (includesGraphql) { _%>
+import { Field, InputType, ObjectType } from "@nestjs/graphql";
 <%_ } _%>
 import { Transform } from "class-transformer";
 import {
@@ -13,9 +17,15 @@ import {
 } from "class-validator";
 import { PASSWORD_MIN_LENGTH, VALIDATION } from "../auth.constants";
 
+<%_ if (includesGraphql) { _%>
+@InputType()
+<%_ } _%>
 export class RegisterDto {
 <%_ if (includesSwagger) { _%>
   @ApiProperty({ example: "user@example.com" })
+<%_ } _%>
+<%_ if (includesGraphql) { _%>
+  @Field(() => String)
 <%_ } _%>
   @Transform(({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim().toLowerCase() : value
@@ -27,6 +37,9 @@ export class RegisterDto {
 <%_ if (includesSwagger) { _%>
   @ApiProperty({ example: "password123", minLength: PASSWORD_MIN_LENGTH })
 <%_ } _%>
+<%_ if (includesGraphql) { _%>
+  @Field(() => String)
+<%_ } _%>
   @IsString()
   @MinLength(PASSWORD_MIN_LENGTH)
   @MaxLength(VALIDATION.PASSWORD_MAX_LENGTH)
@@ -34,6 +47,9 @@ export class RegisterDto {
 
 <%_ if (includesSwagger) { _%>
   @ApiPropertyOptional({ example: "John" })
+<%_ } _%>
+<%_ if (includesGraphql) { _%>
+  @Field(() => String, { nullable: true })
 <%_ } _%>
   @Transform(({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim() || undefined : value
@@ -46,6 +62,9 @@ export class RegisterDto {
 <%_ if (includesSwagger) { _%>
   @ApiPropertyOptional({ example: "Doe" })
 <%_ } _%>
+<%_ if (includesGraphql) { _%>
+  @Field(() => String, { nullable: true })
+<%_ } _%>
   @Transform(({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim() || undefined : value
   )
@@ -55,9 +74,15 @@ export class RegisterDto {
   lastName?: string;
 }
 
+<%_ if (includesGraphql) { _%>
+@InputType()
+<%_ } _%>
 export class LoginDto {
 <%_ if (includesSwagger) { _%>
   @ApiProperty({ example: "user@example.com" })
+<%_ } _%>
+<%_ if (includesGraphql) { _%>
+  @Field(() => String)
 <%_ } _%>
   @Transform(({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim().toLowerCase() : value
@@ -69,58 +94,97 @@ export class LoginDto {
 <%_ if (includesSwagger) { _%>
   @ApiProperty({ example: "password123" })
 <%_ } _%>
+<%_ if (includesGraphql) { _%>
+  @Field(() => String)
+<%_ } _%>
   @IsString()
   @IsNotEmpty()
   @MaxLength(VALIDATION.PASSWORD_MAX_LENGTH)
   password!: string;
 }
 
+<%_ if (includesGraphql) { _%>
+@InputType()
+<%_ } _%>
 export class RefreshTokenDto {
 <%_ if (includesSwagger) { _%>
   @ApiProperty()
+<%_ } _%>
+<%_ if (includesGraphql) { _%>
+  @Field(() => String)
 <%_ } _%>
   @IsString()
   @IsNotEmpty()
   refreshToken!: string;
 }
 
+<%_ if (includesGraphql) { _%>
+@ObjectType()
+<%_ } _%>
 export class AuthTokensDto {
 <%_ if (includesSwagger) { _%>
   @ApiProperty()
+<%_ } _%>
+<%_ if (includesGraphql) { _%>
+  @Field(() => String)
 <%_ } _%>
   accessToken!: string;
 
 <%_ if (includesSwagger) { _%>
   @ApiProperty()
 <%_ } _%>
+<%_ if (includesGraphql) { _%>
+  @Field(() => String)
+<%_ } _%>
   refreshToken!: string;
 }
 
+<%_ if (includesGraphql) { _%>
+@ObjectType()
+<%_ } _%>
 export class AuthUserDto {
 <%_ if (includesSwagger) { _%>
   @ApiProperty()
+<%_ } _%>
+<%_ if (includesGraphql) { _%>
+  @Field(() => String)
 <%_ } _%>
   id!: string;
 
 <%_ if (includesSwagger) { _%>
   @ApiProperty()
 <%_ } _%>
+<%_ if (includesGraphql) { _%>
+  @Field(() => String)
+<%_ } _%>
   email!: string;
 
 <%_ if (includesSwagger) { _%>
   @ApiPropertyOptional({ nullable: true })
+<%_ } _%>
+<%_ if (includesGraphql) { _%>
+  @Field(() => String, { nullable: true })
 <%_ } _%>
   firstName!: string | null;
 
 <%_ if (includesSwagger) { _%>
   @ApiPropertyOptional({ nullable: true })
 <%_ } _%>
+<%_ if (includesGraphql) { _%>
+  @Field(() => String, { nullable: true })
+<%_ } _%>
   lastName!: string | null;
 }
 
+<%_ if (includesGraphql) { _%>
+@ObjectType()
+<%_ } _%>
 export class AuthResponseDto extends AuthTokensDto {
 <%_ if (includesSwagger) { _%>
   @ApiProperty({ type: AuthUserDto })
+<%_ } _%>
+<%_ if (includesGraphql) { _%>
+  @Field(() => AuthUserDto)
 <%_ } _%>
   user!: AuthUserDto;
 }

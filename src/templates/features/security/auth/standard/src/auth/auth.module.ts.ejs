@@ -1,6 +1,9 @@
 <%_ const includesRedis = selectedOptionIds.includes('redis'); _%>
 <%_ const isSequelize = selectedOptionIds.includes('sequelize'); _%>
 <%_ const isTypeOrm = selectedOptionIds.includes('typeorm'); _%>
+<%_ const authTransportsValue = Array.isArray(authTransports) ? authTransports : ['rest']; _%>
+<%_ const includesRest = authTransportsValue.includes('rest'); _%>
+<%_ const includesGraphql = authTransportsValue.includes('graphql'); _%>
 import { Module } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { JwtModule } from "@nestjs/jwt";
@@ -16,7 +19,12 @@ import { RefreshSessionEntity } from "../database/entities/refresh-session.entit
 import { RevokedAccessTokenEntity } from "../database/entities/revoked-access-token.entity";
 <%_ } _%>
 import { UsersModule } from "../users/users.module";
+<%_ if (includesRest) { _%>
 import { AuthController } from "./auth.controller";
+<%_ } _%>
+<%_ if (includesGraphql) { _%>
+import { AuthResolver } from "./auth.resolver";
+<%_ } _%>
 import { AuthService } from "./auth.service";
 import { JwtAuthGuard } from "./guards/jwt-auth.guard";
 import { LocalAuthGuard } from "./guards/local-auth.guard";
@@ -42,9 +50,12 @@ import { LocalStrategy } from "./strategies/local.strategy";
       }),
     }),
   ],
-  controllers: [AuthController],
+  controllers: [<%= includesRest ? 'AuthController' : '' %>],
   providers: [
     AuthService,
+<%_ if (includesGraphql) { _%>
+    AuthResolver,
+<%_ } _%>
     JwtAuthGuard,
     LocalAuthGuard,
     JwtStrategy,
