@@ -95,6 +95,26 @@ export const featureOptions: TechnologyOption<InitPromptData>[] = [
     }),
   },
   {
+    id: "schedule",
+    label: "Task Scheduling",
+    description: "Enables @nestjs/schedule with an example cron job",
+    contribute: () => ({
+      slots: {
+        "app.module.imports": [
+          "import { ScheduleModule } from '@nestjs/schedule';",
+          "import { TasksService } from './tasks/tasks.service';",
+        ],
+        "app.module.moduleImports": ["ScheduleModule.forRoot()"],
+        "app.module.providers": ["TasksService"],
+      },
+      packageJson: {
+        dependencies: {
+          "@nestjs/schedule": "^6.0.0",
+        },
+      },
+    }),
+  },
+  {
     id: "elasticsearch",
     label: "Elasticsearch",
     description: "Configures ElasticsearchModule with environment-based auth",

@@ -284,6 +284,13 @@ function verifyFeatureDependencies(blueprint, selectionCase) {
     );
   }
 
+  if (selectionCase.features.includes("schedule")) {
+    ensure(
+      packageJson.dependencies["@nestjs/schedule"],
+      "@nestjs/schedule dependency missing when schedule is selected"
+    );
+  }
+
   if (selectionCase.orm === "none") {
     ensure(
       !envEntries.some((entry) => entry.startsWith('DATABASE_URL=')),
@@ -327,6 +334,13 @@ function verifyOptionalFeatureLeakage(blueprint, selectionCase) {
     ensure(
       !packageJson.dependencies["@nestjs/elasticsearch"],
       "@nestjs/elasticsearch should not be present when elasticsearch is not selected"
+    );
+  }
+
+  if (!selectedOptionIds.has("schedule")) {
+    ensure(
+      !packageJson.dependencies["@nestjs/schedule"],
+      "@nestjs/schedule should not be present when schedule is not selected"
     );
   }
 }
@@ -674,6 +688,50 @@ function verifyAuthVariant(outputRoot, selectionCase) {
   }
 }
 
+function verifyScheduleVariant(outputRoot, selectionCase) {
+  const includesSchedule = Array.isArray(selectionCase.selectedOptionIds)
+    ? selectionCase.selectedOptionIds.includes("schedule")
+    : false;
+  const tasksServicePath = path.join(outputRoot, "src", "tasks", "tasks.service.ts");
+  const appModulePath = path.join(outputRoot, "src", "app.module.ts");
+  const appModule = fs.readFileSync(appModulePath, "utf8");
+
+  if (includesSchedule) {
+    ensure(
+      fs.existsSync(tasksServicePath),
+      "tasks.service.ts must be generated when schedule is selected"
+    );
+
+    const tasksService = fs.readFileSync(tasksServicePath, "utf8");
+
+    ensure(
+      appModule.includes("ScheduleModule.forRoot()"),
+      "AppModule must register ScheduleModule when schedule is selected"
+    );
+    ensure(
+      appModule.includes("import { TasksService } from './tasks/tasks.service';"),
+      "AppModule must import TasksService when schedule is selected"
+    );
+    ensure(
+      appModule.includes("TasksService"),
+      "AppModule must register TasksService when schedule is selected"
+    );
+    ensure(
+      tasksService.includes("@Cron(CronExpression.EVERY_MINUTE"),
+      "TasksService must include the example cron decorator"
+    );
+  } else {
+    ensure(
+      !fs.existsSync(tasksServicePath),
+      "tasks.service.ts must not be generated when schedule is not selected"
+    );
+    ensure(
+      !appModule.includes("ScheduleModule.forRoot()"),
+      "AppModule must not register ScheduleModule when schedule is not selected"
+    );
+  }
+}
+
 async function verifySuccessfulCase(selectionCase, options = {}) {
   const blueprint = createInitBlueprint(createPromptData(selectionCase));
   verifyFeatureDependencies(blueprint, selectionCase);
@@ -706,6 +764,7 @@ async function verifySuccessfulCase(selectionCase, options = {}) {
 
     verifyGeneratedTree(outputRoot);
     verifyAuthVariant(outputRoot, effectiveSelectionCase);
+    verifyScheduleVariant(outputRoot, effectiveSelectionCase);
 
     if (options.outputDir) {
       writeArtifactCase(options.outputDir, selectionCase, {

@@ -25,6 +25,7 @@ import { GqlThrottlerGuard } from './common/guards/gql-throttler.guard';
 <%
 const appModuleImports = getSlot('app.module.imports');
 const appModuleEntries = getSlot('app.module.moduleImports');
+const appModuleProviders = getSlot('app.module.providers');
 -%>
 <%_ if (appModuleImports.length > 0) { _%>
 <%- appModuleImports.join('\n') %>
@@ -106,6 +107,9 @@ import { AppService } from './app.service';
     AppService,
 <%_ if (includesGraphql) { _%>
     AppResolver,
+<%_ } _%>
+<%_ if (appModuleProviders.length > 0) { _%>
+<%- appModuleProviders.map((provider) => `    ${provider},`).join('\n') %>
 <%_ } _%>
 <%_ if (includesThrottler) { _%>
     {

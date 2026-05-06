@@ -144,6 +144,13 @@ Sequelize is the selected ORM.
 <%_ } else { _%>
 - Swagger is not selected. Do not add `@nestjs/swagger` imports or decorators.
 <%_ } _%>
+<%_ if (selectedOptionIds.includes('schedule')) { _%>
+- Task Scheduling is selected. Use the existing `ScheduleModule` wiring and scheduler providers for cron jobs, intervals, and timeouts.
+- Keep cron expressions, job names, and time zone assumptions explicit and close to the feature that owns them.
+- Prefer idempotent scheduled handlers and avoid overlapping work for long-running jobs.
+<%_ } else { _%>
+- Task Scheduling is not selected. Do not add `@nestjs/schedule`, cron decorators, or scheduler bootstrap code unless requested.
+<%_ } _%>
 <%_ if (selectedOptionIds.includes('elasticsearch')) { _%>
 - Elasticsearch is selected. Use the existing `ElasticsearchModule` wiring and `ELASTICSEARCH_*` configuration.
 - Keep index names, mappings, and search DTOs explicit and close to the feature that owns them.

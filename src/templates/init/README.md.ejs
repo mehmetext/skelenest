@@ -68,6 +68,16 @@ $ <%= pmRunCommandPrefix %> test:e2e
 $ <%= pmRunCommandPrefix %> test:cov
 ```
 
+<%_ if (selectedOptionIds.includes('schedule')) { _%>
+## Task scheduling
+
+This project includes Nest task scheduling via `@nestjs/schedule`.
+
+An example cron job lives in `src/tasks/tasks.service.ts` and is registered through `ScheduleModule.forRoot()` in `AppModule`.
+
+Start the app in watch mode and replace the sample handler with your own recurring jobs, intervals, or timeouts as needed.
+<%_ } _%>
+
 ## Deployment
 
 When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.

@@ -11,7 +11,7 @@ It covers the first project bootstrap, architecture-aware code generation inside
 - Creates a new NestJS project in a new directory
 - Lets you choose a package manager: `npm`, `pnpm`, or `yarn`
 - Lets you choose an ORM: `Prisma`, `TypeORM`, `Sequelize`, or none
-- Lets you enable optional features such as `Docker`, `Redis`, `BullMQ`, `Swagger`, `Throttler`, and an auth starter
+- Lets you enable optional features such as `Docker`, `Redis`, `BullMQ`, `Swagger`, `Throttler`, `Task Scheduling`, and an auth starter
 - Generates modules, CRUD resources, DTOs, and use cases inside an existing Skelenest project
 - Verifies generated projects with `doctor`, including stack wiring, required files, scripts, and selected feature checks
 - Sets up request validation defaults with Nest's global `ValidationPipe`
@@ -62,7 +62,7 @@ skelenest init \
   --package-manager pnpm \
   --orm prisma \
   --architecture clean \
-  --features swagger,bullmq \
+  --features swagger,bullmq,schedule \
   --modules auth \
   --no-install \
   --no-git
@@ -131,7 +131,7 @@ standard-api/
 Command:
 
 ```bash
-skelenest init --name clean-api --port 3000 --package-manager pnpm --orm prisma --architecture clean --features swagger,bullmq --modules auth --no-install --no-git
+skelenest init --name clean-api --port 3000 --package-manager pnpm --orm prisma --architecture clean --features swagger,bullmq,schedule --modules auth --no-install --no-git
 ```
 
 Representative output:
@@ -175,6 +175,7 @@ clean-api/
 - `BullMQ`
 - `Throttler`
 - `Swagger`
+- `Task Scheduling`
 - `Auth Starter Module`
 
 Some options are dependency-aware. For example, selecting `BullMQ` automatically pulls in the Redis stack.
@@ -189,6 +190,7 @@ Some options are dependency-aware. For example, selecting `BullMQ` automatically
 | `--features redis` | `redis` | Adds Redis dependencies and `REDIS_URL` configuration |
 | `--features bullmq` | `bullmq` | Adds BullMQ and implicitly pulls in the Redis stack |
 | `--features throttler` | `throttler` | Adds global throttling and Redis-backed storage when Redis is selected |
+| `--features schedule` | `schedule` | Adds `ScheduleModule.forRoot()` and an example cron job service |
 | `--features docker` | `docker` | Adds `Dockerfile`, `.dockerignore`, and `docker-compose.yml` |
 | `--modules auth` | `auth` | Adds auth and users starter modules tailored to the selected architecture; supported with Prisma, TypeORM, or Sequelize |
 
